@@ -317,9 +317,10 @@ table.rules td:first-child { font-weight: 900; width: 92px; }
 .story-cap { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; font-size: 12px; line-height: 1.35; }
 .story-cap .no { flex: none; font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--deep-mint); }
 .episodes { list-style: none; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
-.episodes li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; padding: 10px 14px; border-radius: 14px; background: #fff; border: 1px solid var(--line-2); }
+.episodes li { display: grid; grid-template-columns: 116px 1fr; gap: 12px; align-items: center; padding: 9px 12px 9px 9px; border-radius: 14px; background: #fff; border: 1px solid var(--line-2); }
 .episodes li.on { background: var(--plum); color: var(--cloud); border-color: transparent; }
-.episodes .n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--sand); font-family: var(--display); font-weight: 800; font-size: 16px; color: var(--plum); }
+.episodes .thumb { border-radius: 9px; }
+.episodes .n { position: absolute; top: 5px; left: 5px; z-index: 2; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--sand); font-family: var(--display); font-weight: 800; font-size: 13px; color: var(--plum); }
 .episodes li.on .n { background: var(--lime); }
 .episodes .hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .episodes .h3 { font-size: 17px; }

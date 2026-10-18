@@ -224,3 +224,25 @@ her world. Model `nano_banana_pro`, XEXE V3 (job `80af72af`) as reference.
   it was redone from that frame with: *the plush mascot hugging her has NO
   TAIL at all. He is a cute plush baby gorilla character, not a monkey.*
 - Episodes 2–4: not generated yet; each needs approval first.
+
+Episodes 2–4 were generated together after the user approved Ep 1 and asked
+for the rest at once, each with the Ep 1 frame (`7275ed44`), XEXE V3
+(`80af72af`) and XOXO V3 (`a1b380a7`) as references:
+
+- **Ep 2 "XEXE meets XOXO"**: same bedroom, late night at the desk, script
+  due; XEXE leans toward the phone as XOXO peeks out from behind it for the
+  first time; the creator watches in wonder.
+- **Ep 3 "The First Mission"**: same room in bright morning light; the
+  creator drafts a script on her laptop while XOXO arranges glowing blank
+  cards into an outline and XEXE gives a thumbs-up.
+- **Ep 4 "A Glow in the Sky"**: dusk rooftop in an Indian city, seen from
+  behind; the three look up at a small, undefined glow among the first stars.
+
+Every prompt repeats that XEXE is a plush baby gorilla with NO TAIL.
+
+### 11. XEXE expression strip (16:9, 2 credits)
+
+XEXE V3 as reference: four head-and-shoulders poses in a row on light grey
+(wave, thinking, celebrating, hand on heart). The render has a blurry
+artefact below the poses, so the manifest crops it to the heads-and-shoulders
+band.

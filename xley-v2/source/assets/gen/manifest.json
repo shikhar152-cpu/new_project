@@ -38,6 +38,32 @@
       "prompt": "10 Ep1",
       "job_id": "7275ed44-9cab-410d-bafe-46e7b60254e1",
       "file": "hf_20261018_154058_7275ed44-9cab-410d-bafe-46e7b60254e1.png"
+    },
+    "ep2_v3": {
+      "prompt": "10 Ep2",
+      "job_id": "4695e2ec-37f9-4e94-921c-0e1188d50344",
+      "file": "hf_20261018_154539_4695e2ec-37f9-4e94-921c-0e1188d50344.png"
+    },
+    "ep3_v3": {
+      "prompt": "10 Ep3",
+      "job_id": "f6cdfa6d-3f3e-4fcb-bb93-f36a5ddeb48e",
+      "file": "hf_20261018_154539_f6cdfa6d-3f3e-4fcb-bb93-f36a5ddeb48e.png"
+    },
+    "ep4_v3": {
+      "prompt": "10 Ep4",
+      "job_id": "93ebb899-101d-47c9-8a17-c35b6f144010",
+      "file": "hf_20261018_154539_93ebb899-101d-47c9-8a17-c35b6f144010.png"
+    },
+    "xexe_expressions_v3": {
+      "prompt": "11",
+      "job_id": "3332a36c-6282-4f5e-b238-5d64496a0699",
+      "file": "hf_20261018_154539_3332a36c-6282-4f5e-b238-5d64496a0699.png",
+      "crop": [
+        0.0,
+        0.15,
+        1.0,
+        0.685
+      ]
     }
   },
   "retired": {
