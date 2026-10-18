@@ -1,0 +1,71 @@
+{
+  "note": "Higgsfield concept-art jobs (requested model nano_banana_pro, 2k). Concept art only: not approved characters. See source/higgsfield_prompts.md for the prompts. Job records list the engine as nano_banana_2.",
+  "cdn": "https://d8j0ntlcm91z4.cloudfront.net/user_37sX3hKS83akbmpTPZSU1gMC1WB/",
+  "images": {
+    "xexe_hero_a": {
+      "prompt": "1 (wave, 3/4)",
+      "job_id": "7821acee-22d4-4000-86ea-6f78678a7056",
+      "file": "hf_20261018_141649_7821acee-22d4-4000-86ea-6f78678a7056.png"
+    },
+    "xexe_hero_b": {
+      "prompt": "1 (front)",
+      "job_id": "b5ce17d5-7cc9-4939-8989-44d17bb2cb3e",
+      "file": "hf_20261018_141648_b5ce17d5-7cc9-4939-8989-44d17bb2cb3e.png"
+    },
+    "xoxo_a_glowdrop": {
+      "prompt": "3A",
+      "job_id": "112612cb-8dd5-4f0d-97fc-11f88254a2bb",
+      "file": "hf_20261018_141648_112612cb-8dd5-4f0d-97fc-11f88254a2bb.png"
+    },
+    "xoxo_b_orbit": {
+      "prompt": "3B",
+      "job_id": "4a354ff1-aad8-498d-ba88-3b891839a5f9",
+      "file": "hf_20261018_141648_4a354ff1-aad8-498d-ba88-3b891839a5f9.png"
+    },
+    "xoxo_c_fold": {
+      "prompt": "3C",
+      "job_id": "74e829b9-a1ec-475a-a171-70b76055a890",
+      "file": "hf_20261018_141649_74e829b9-a1ec-475a-a171-70b76055a890.png"
+    },
+    "infl_tinku": {
+      "prompt": "6A",
+      "job_id": "8d991098-16a6-4ce3-a538-6a29f6917cf5",
+      "file": "hf_20261018_141648_8d991098-16a6-4ce3-a538-6a29f6917cf5.png"
+    },
+    "infl_noor": {
+      "prompt": "6B",
+      "job_id": "3a8e0e9d-41e7-48f2-b890-a005ca4ed67d",
+      "file": "hf_20261018_141648_3a8e0e9d-41e7-48f2-b890-a005ca4ed67d.png"
+    },
+    "xexe_expressions": {
+      "prompt": "2",
+      "job_id": "ffda4fee-801a-4b6c-932b-47c42379beb6",
+      "file": "hf_20261018_141944_ffda4fee-801a-4b6c-932b-47c42379beb6.png"
+    },
+    "duet_key_visual": {
+      "prompt": "4",
+      "job_id": "e10be2af-000b-46d7-8a5e-52776067b03c",
+      "file": "hf_20261018_141944_e10be2af-000b-46d7-8a5e-52776067b03c.png"
+    },
+    "ep1_meet_xexe": {
+      "prompt": "5 Ep1",
+      "job_id": "9b872499-1596-4397-a13a-2245afab561f",
+      "file": "hf_20261018_141944_9b872499-1596-4397-a13a-2245afab561f.png"
+    },
+    "ep2_xexe_meets_xoxo": {
+      "prompt": "5 Ep2",
+      "job_id": "77623024-0d6b-48aa-9448-c2c3a2a1dc98",
+      "file": "hf_20261018_141944_77623024-0d6b-48aa-9448-c2c3a2a1dc98.png"
+    },
+    "ep3_first_mission": {
+      "prompt": "5 Ep3",
+      "job_id": "f9b26a5d-b24d-402e-8e23-fda09f5abff1",
+      "file": "hf_20261018_141944_f9b26a5d-b24d-402e-8e23-fda09f5abff1.png"
+    },
+    "ep4_crew_hint": {
+      "prompt": "5 Ep4",
+      "job_id": "7bed4968-e795-4c70-8934-8ea2ba0cd36b",
+      "file": "hf_20261018_141945_7bed4968-e795-4c70-8934-8ea2ba0cd36b.png"
+    }
+  }
+}
