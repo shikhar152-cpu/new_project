@@ -14,9 +14,11 @@
 <!-- Shared vector art: XEXE and XOXO placeholders / UI icons (native vectors, not final character art) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
+    <!-- Opaque glow (mint blended into plum): XOXO icons always sit on plum, and an alpha
+         gradient becomes a soft mask that some PDF viewers draw as a box. -->
     <radialGradient id="glow" cx="50%" cy="55%" r="50%">
-      <stop offset="0" stop-color="#56C6B7" stop-opacity=".6"/>
-      <stop offset="1" stop-color="#56C6B7" stop-opacity="0"/>
+      <stop offset="0" stop-color="#42827F"/>
+      <stop offset="1" stop-color="#241B36"/>
     </radialGradient>
     <linearGradient id="dropg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#A6EDE2"/>
@@ -39,11 +41,11 @@
       <rect x="100" y="61" width="29" height="26" rx="7" fill="none" stroke="#1E1A1A" stroke-width="4"/>
       <ellipse cx="100" cy="94" rx="7" ry="4.6" fill="#D98F86"/>
       <path d="M90 103 Q100 111 110 103" stroke="#8A5A3A" stroke-width="3" fill="none" stroke-linecap="round"/>
-      <ellipse cx="70" cy="97" rx="7" ry="4" fill="#F08F8F" opacity=".7"/>
-      <ellipse cx="130" cy="97" rx="7" ry="4" fill="#F08F8F" opacity=".7"/>
+      <ellipse cx="70" cy="97" rx="7" ry="4" fill="#F08F8F" fill-opacity=".7"/>
+      <ellipse cx="130" cy="97" rx="7" ry="4" fill="#F08F8F" fill-opacity=".7"/>
     </g>
     <g id="xexeBody">
-      <ellipse cx="100" cy="236" rx="58" ry="6" fill="#241B36" opacity=".12"/>
+      <ellipse cx="100" cy="236" rx="58" ry="6" fill="#241B36" fill-opacity=".12"/>
       <rect x="70" y="196" width="26" height="38" rx="12" fill="#C99A5B"/>
       <rect x="104" y="196" width="26" height="38" rx="12" fill="#C99A5B"/>
       <path d="M100 112 C 58 112 44 152 46 184 C 48 212 72 222 100 222 C 128 222 152 212 154 184 C 156 152 142 112 100 112 Z" fill="#3FB3A6"/>
@@ -62,11 +64,11 @@
       <ellipse cx="145" cy="94" rx="9" ry="15" fill="#56C6B7" transform="rotate(-28 145 94)"/>
       <ellipse cx="86" cy="162" rx="10" ry="7" fill="#3FA899"/><ellipse cx="114" cy="162" rx="10" ry="7" fill="#3FA899"/>
       <rect x="60" y="62" width="80" height="100" rx="40" fill="url(#dropg)"/>
-      <ellipse cx="80" cy="82" rx="8" ry="13" fill="#fff" opacity=".35" transform="rotate(-22 80 82)"/>
+      <ellipse cx="80" cy="82" rx="8" ry="13" fill="#fff" fill-opacity=".35" transform="rotate(-22 80 82)"/>
       <ellipse cx="86" cy="105" rx="8" ry="9" fill="#1F2A3A"/><circle cx="88.5" cy="101.5" r="2.8" fill="#fff"/>
       <ellipse cx="114" cy="105" rx="8" ry="9" fill="#1F2A3A"/><circle cx="116.5" cy="101.5" r="2.8" fill="#fff"/>
-      <ellipse cx="75" cy="120" rx="6" ry="3.6" fill="#F08F8F" opacity=".75"/>
-      <ellipse cx="125" cy="120" rx="6" ry="3.6" fill="#F08F8F" opacity=".75"/>
+      <ellipse cx="75" cy="120" rx="6" ry="3.6" fill="#F08F8F" fill-opacity=".75"/>
+      <ellipse cx="125" cy="120" rx="6" ry="3.6" fill="#F08F8F" fill-opacity=".75"/>
       <path d="M95 119 Q100 124 105 119" stroke="#1F2A3A" stroke-width="2.6" fill="none" stroke-linecap="round"/>
       <path d="M140 24 L143.5 36.5 L156 40 L143.5 43.5 L140 56 L136.5 43.5 L124 40 L136.5 36.5 Z" fill="#B7E64C" transform="translate(-40 2)"/>
     </g>
