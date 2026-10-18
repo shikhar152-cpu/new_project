@@ -169,6 +169,10 @@ ul.dots li::before {
 .cover-right .art { border-radius: 22px; box-shadow: 0 30px 60px rgba(0, 0, 0, .35); }
 .cover-meta { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 11px; color: var(--on-dark-muted); }
 .cover-meta .who { color: var(--cloud); font-weight: 800; }
+.concept-note {
+  margin-top: 10px; display: inline-block; align-self: flex-start; padding: 5px 12px; border: 1.5px solid var(--lime); border-radius: 99px;
+  color: var(--lime); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+}
 .bharosa {
   position: absolute; right: 40px; top: -6px; font-family: 'Baloo 2', sans-serif; font-weight: 800; font-size: 150px;
   line-height: 1; color: rgba(247, 245, 241, .05); pointer-events: none;
