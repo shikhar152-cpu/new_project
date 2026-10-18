@@ -44,6 +44,10 @@ def main():
                 print(f"fail {name}: {e}")
                 continue
         im = Image.open(raw).convert("RGB")
+        if "crop" in item:  # fractional [left, top, right, bottom]
+            l, t, r, b = item["crop"]
+            w, h = im.size
+            im = im.crop((round(l * w), round(t * h), round(r * w), round(b * h)))
         edge = max_edge(name)
         im.thumbnail((edge, edge), Image.LANCZOS)
         buf = io.BytesIO()

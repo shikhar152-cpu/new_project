@@ -121,6 +121,8 @@ ul.dots li::before {
 /* ---------- art frames: generated image if present, vector placeholder if not ---------- */
 .art { position: relative; overflow: hidden; border-radius: 16px; background: var(--sand); }
 .art > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.art.contain.loaded { background: #C9C7CA; }   /* matches the studio grey of the XEXE render */
+.art.contain > img { object-fit: contain; }
 .art .ph { position: absolute; inset: 0; display: grid; place-items: center; }
 .art.loaded .ph { display: none; }
 .art .lbl {

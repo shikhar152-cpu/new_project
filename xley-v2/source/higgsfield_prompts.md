@@ -113,3 +113,67 @@ outfits or typography copied from it.
   her cheek ("Trend Court" host). Soft-sand background.
 - **Slot 3**: no image. It stays open until the two-persona pilot proves it
   can be produced.
+
+---
+
+## V3 updates (approved one at a time, 18 Oct 2026)
+
+The user rejected the V2 XEXE (gorilla-teddy in a puffer jacket) and the CG
+influencers. Each image below was proposed with its credit cost, generated
+only after a yes, and approved before the next one. Sections 1, 2, 4, 5 and 6
+are retired; the storyboard frames will be regenerated with the V3 XEXE.
+
+### 7. XEXE V3 — friendlier plush version of today's mascot (4:5, 2 credits)
+
+Model `nano_banana_pro`, with `assets/ref/current_mascot_IMG_9659.jpg` as the
+image reference. Concept: like Meta's Muse mascot (a simple, friendly
+companion for an AI product), but drawn from XLEY's own mascot.
+
+> Redesign the monkey mascot from the reference image into a softer,
+> friendlier, upgraded version, keeping it clearly recognisable as the same
+> character. Keep: the spiky sandy-blonde hair tuft on top, the black
+> rectangular glasses, the big round ears, the warm brown eyes, the teal /
+> blue / lime-green colour scheme. Make it: a premium cuddly plush-toy
+> character with a rounder, chubbier, simpler shape, bigger head about half of
+> its height, short stubby arms and legs, soft fuzzy fur, a rounder cuter face
+> with a gentle warm smile, soft pink cheeks, bigger friendly eyes behind the
+> glasses. Simplify the outfit into one soft cosy teal hoodie with lime-green
+> cuffs and drawstrings, no jacket layers, no chain, no shoes or simple soft
+> feet. Pose: standing, one hand giving a small friendly wave, slightly tilted
+> head. Feels warm, safe, trustworthy and fun, like a beloved app companion.
+> Premium 3D animated character render with soft plush materials, soft studio
+> lighting, plain light grey background, soft floor shadow, full body
+> centered. No text, no logos, no brand marks, no watermark.
+
+Two rejected tries before this one (2 credits each): a plain brown plush
+monkey, and a mint-teal fluffy plush.
+
+### 8. Virtual influencers — Higgsfield AI Influencer tool (1.125 credits each)
+
+Tier `freak` (Bold), `randomize=false`, styled after the energy of
+`assets/ref/influencer_energy_IMG_9851.jpg`: real-looking people, odd
+haircuts, deadpan faces, white backdrop. New faces; nothing copied.
+
+- **8A (Tripod Tinku)**: male, Indian, adult, brown skin, slim, tall, long
+  limbs, bowl cut, jet black, push-broom moustache, suits, long head, long
+  neck, almond brown eyes, thick brows, jug ears. Brief: *Photorealistic,
+  looks like a real person photographed in a studio, not CG or cartoon. Young
+  Indian man with a thick glossy jet-black bowl cut and a big push-broom
+  moustache, deadpan serious face, direct gaze. Retro brown checked tweed
+  blazer, white shirt, striped tie. Plain white background, chest-up
+  editorial portrait, soft even light. Original face, not a copy of any real
+  person.*
+- **8B (Noor Nazar)**: female, Indian, adult, tan skin, slim, tall, long
+  limbs, shelf bob, jet black, retro, long head, long neck, almond brown eyes,
+  thick brows, beauty mark. Brief: *Photorealistic, looks like a real person
+  photographed in a studio, not CG or cartoon. Young Indian woman with a
+  sharp, glossy jet-black shelf bob with a heavy blunt fringe cut straight
+  across the brows, deadpan serious face, one eyebrow slightly raised, direct
+  gaze. Retro outfit: mustard and brown patterned vintage blouse with a big
+  collar under a brown corduroy blazer. Plain white background, chest-up
+  editorial portrait, soft even light. Original face, not a copy of any real
+  person.*
+
+The tool returns a 16:9 sheet (close-up left, full body right);
+`fetch_images.py` crops the close-up to 4:5 using the `crop` box in the
+manifest.
