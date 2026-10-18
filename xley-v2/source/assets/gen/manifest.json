@@ -1,22 +1,7 @@
 {
-  "note": "Higgsfield concept-art jobs. Concept art only: names and designs still need founder and legal sign-off. See source/higgsfield_prompts.md for the prompts. xexe_v3, infl_1 and infl_2 were approved by the user one at a time on 18 Oct 2026. 'crop' is a fractional [left, top, right, bottom] box applied before resizing. 'retired' lists earlier V2 jobs the deck no longer uses.",
+  "note": "Higgsfield concept-art jobs. Concept art only: names and designs still need founder and legal sign-off. See source/higgsfield_prompts.md for the prompts. xexe_v3, infl_1, infl_2 and xoxo_v3 were approved by the user one at a time on 18 Oct 2026. 'crop' is a fractional [left, top, right, bottom] box applied before resizing. 'retired' lists earlier V2 jobs the deck no longer uses. 'composites' are built by fetch_images.py from the downloaded originals.",
   "cdn": "https://d8j0ntlcm91z4.cloudfront.net/user_37sX3hKS83akbmpTPZSU1gMC1WB/",
   "images": {
-    "xoxo_a_glowdrop": {
-      "prompt": "3A",
-      "job_id": "112612cb-8dd5-4f0d-97fc-11f88254a2bb",
-      "file": "hf_20261018_141648_112612cb-8dd5-4f0d-97fc-11f88254a2bb.png"
-    },
-    "xoxo_b_orbit": {
-      "prompt": "3B",
-      "job_id": "4a354ff1-aad8-498d-ba88-3b891839a5f9",
-      "file": "hf_20261018_141648_4a354ff1-aad8-498d-ba88-3b891839a5f9.png"
-    },
-    "xoxo_c_fold": {
-      "prompt": "3C",
-      "job_id": "74e829b9-a1ec-475a-a171-70b76055a890",
-      "file": "hf_20261018_141649_74e829b9-a1ec-475a-a171-70b76055a890.png"
-    },
     "xexe_v3": {
       "prompt": "7",
       "job_id": "80af72af-41f8-486f-aae6-797fc078abf6",
@@ -43,6 +28,11 @@
         0.4762,
         1.0
       ]
+    },
+    "xoxo_v3": {
+      "prompt": "9",
+      "job_id": "a1b380a7-619c-4562-930a-70def964b6b5",
+      "file": "hf_20261018_153151_a1b380a7-619c-4562-930a-70def964b6b5.png"
     }
   },
   "retired": {
@@ -95,6 +85,69 @@
       "prompt": "6B",
       "job_id": "3a8e0e9d-41e7-48f2-b890-a005ca4ed67d",
       "file": "hf_20261018_141648_3a8e0e9d-41e7-48f2-b890-a005ca4ed67d.png"
+    },
+    "xoxo_a_glowdrop": {
+      "prompt": "3A",
+      "job_id": "112612cb-8dd5-4f0d-97fc-11f88254a2bb",
+      "file": "hf_20261018_141648_112612cb-8dd5-4f0d-97fc-11f88254a2bb.png"
+    },
+    "xoxo_b_orbit": {
+      "prompt": "3B",
+      "job_id": "4a354ff1-aad8-498d-ba88-3b891839a5f9",
+      "file": "hf_20261018_141648_4a354ff1-aad8-498d-ba88-3b891839a5f9.png"
+    },
+    "xoxo_c_fold": {
+      "prompt": "3C",
+      "job_id": "74e829b9-a1ec-475a-a171-70b76055a890",
+      "file": "hf_20261018_141649_74e829b9-a1ec-475a-a171-70b76055a890.png"
+    }
+  },
+  "composites": {
+    "cover_duo": {
+      "note": "XEXE and XOXO side by side for the cover and page 10; both renders share the same grey studio backdrop",
+      "size": [
+        1600,
+        900
+      ],
+      "bg": [
+        [
+          200,
+          198,
+          201
+        ],
+        [
+          226,
+          223,
+          224
+        ]
+      ],
+      "feather": 80,
+      "layers": [
+        {
+          "src": "xexe_v3",
+          "box": [
+            150,
+            0,
+            725,
+            900
+          ]
+        },
+        {
+          "src": "xoxo_v3",
+          "crop": [
+            0.15,
+            0.0,
+            0.85,
+            1.0
+          ],
+          "box": [
+            840,
+            0,
+            630,
+            900
+          ]
+        }
+      ]
     }
   }
 }

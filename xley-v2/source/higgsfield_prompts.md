@@ -177,3 +177,28 @@ haircuts, deadpan faces, white backdrop. New faces; nothing copied.
 The tool returns a 16:9 sheet (close-up left, full body right);
 `fetch_images.py` crops the close-up to 4:5 using the `crop` box in the
 manifest.
+
+### 9. XOXO V3 — XEXE's AI sidekick as a mascot (1:1, 2 credits)
+
+Model `nano_banana_pro`, with the approved XEXE V3 (job `80af72af`) as the
+image reference so the two match. Replaces the Glow Drop, Orbit and Fold
+explorations (section 3, retired).
+
+> Character design of XOXO, a new original mascot who is the small AI sidekick
+> of the plush monkey in the reference image. Match the reference exactly in
+> render style, materials, lighting and background so the two look like a
+> pair from the same toy line, but XOXO is a different character, not a
+> monkey. XOXO: a small, round, chubby little buddy about half the monkey's
+> size, shaped like a soft rounded bean, made of soft mint-teal (#56C6B7)
+> plush with a gentle inner glow as if lit softly from inside. Big friendly
+> glossy dark eyes with sparkles, soft pink cheeks, a tiny happy smile. A small
+> glowing electric-lime (#B7E64C) four-point spark floating just above its
+> head like a little idea. Two tiny stubby arms, one raised in a cheerful
+> wave, tiny nub feet, floating slightly above the ground with a soft mint
+> glow beneath. Clever, calm, cute and friendly. No clothes, no glasses, no
+> robot parts, no screens, no antenna wires. Premium 3D animated character
+> render, soft studio lighting, plain light grey background, soft floor glow,
+> centered with generous margin. No text, no logos, no watermark.
+
+The cover and page 10 use `cover_duo`, a composite of XEXE V3 and XOXO V3
+built by `fetch_images.py` (see `composites` in the manifest).
