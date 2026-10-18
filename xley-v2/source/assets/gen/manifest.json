@@ -33,6 +33,11 @@
       "prompt": "9",
       "job_id": "a1b380a7-619c-4562-930a-70def964b6b5",
       "file": "hf_20261018_153151_a1b380a7-619c-4562-930a-70def964b6b5.png"
+    },
+    "ep1_v3": {
+      "prompt": "10 Ep1",
+      "job_id": "7275ed44-9cab-410d-bafe-46e7b60254e1",
+      "file": "hf_20261018_154058_7275ed44-9cab-410d-bafe-46e7b60254e1.png"
     }
   },
   "retired": {
@@ -100,6 +105,11 @@
       "prompt": "3C",
       "job_id": "74e829b9-a1ec-475a-a171-70b76055a890",
       "file": "hf_20261018_141649_74e829b9-a1ec-475a-a171-70b76055a890.png"
+    },
+    "ep1_v3_tail": {
+      "prompt": "10 Ep1 (first try, rejected: XEXE had a tail)",
+      "job_id": "ade69b05-7e96-4331-b384-81f33d8d73c6",
+      "file": "hf_20261018_153816_ade69b05-7e96-4331-b384-81f33d8d73c6.png"
     }
   },
   "composites": {

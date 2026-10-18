@@ -145,8 +145,9 @@ companion for an AI product), but drawn from XLEY's own mascot.
 > lighting, plain light grey background, soft floor shadow, full body
 > centered. No text, no logos, no brand marks, no watermark.
 
-Two rejected tries before this one (2 credits each): a plain brown plush
-monkey, and a mint-teal fluffy plush.
+Two rejected tries before this one (2 credits each): a plain brown plush,
+and a mint-teal fluffy plush. XEXE is a gorilla, not a monkey: never draw a
+tail (the user rejected the first storyboard frame for having one).
 
 ### 8. Virtual influencers — Higgsfield AI Influencer tool (1.125 credits each)
 
@@ -202,3 +203,24 @@ explorations (section 3, retired).
 
 The cover and page 10 use `cover_duo`, a composite of XEXE V3 and XOXO V3
 built by `fetch_images.py` (see `composites` in the manifest).
+
+### 10. Launch story frames (16:9, 2 credits each, one at a time)
+
+Live-action look: a real-looking creator, with XEXE as a soft CG character in
+her world. Model `nano_banana_pro`, XEXE V3 (job `80af72af`) as reference.
+
+- **Ep 1 "Meet XEXE"**: *Cinematic live-action film still, photorealistic,
+  like a modern family film where a CG character lives in the real world.
+  Night, a small cosy bedroom studio in an Indian city: ring light, phone on a
+  mini tripod, warm fairy lights, a laptop, plants. A young Indian woman
+  creator in her early 20s with long dark wavy hair in a loose bun and an
+  oversized grey hoodie sits on her bed, overwhelmed, rubbing her temples; her
+  phone screen glows with a flood of blurred chat bubbles and red notification
+  badges (nothing readable). Beside her sits the plush mascot from the
+  reference image, exactly the same design, as a soft realistic CG character
+  about the size of a small child, giving her a warm side-hug; she is starting
+  to smile. Warm lamp light on his side, cool blue phone light on the other.
+  The creator is the hero of the shot.* The first result gave XEXE a tail, so
+  it was redone from that frame with: *the plush mascot hugging her has NO
+  TAIL at all. He is a cute plush baby gorilla character, not a monkey.*
+- Episodes 2–4: not generated yet; each needs approval first.
