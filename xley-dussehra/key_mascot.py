@@ -1,16 +1,17 @@
 # Magenta-screen keyer for the mascot clip.
-# usage: python3 key_mascot.py <frames_dir> <out_dir> [count] [height] [x0,y0,x1,y1]
-#   frames_dir: raw RGB frames raw_001.png ... (decoded with full chroma interpolation)
-#   out_dir:    RGBA frames m_000.png ... cropped to one shared box (the given one, or the
-#               union of all frames) and scaled to <height> px
+# usage: python3 key_mascot.py FRAMES OUT [--count N] [--height H] [--box x0,y0,x1,y1] [--ai MODEL]
+#   FRAMES: raw RGB frames raw_001.png ... (decoded with full chroma interpolation)
+#   OUT:    RGBA frames m_000.png ... cropped to one shared box (--box, or the union of all
+#           frames) and scaled to H px
+#   --ai:   take the matte's shape from a rembg segmentation model (e.g. isnet-anime) instead
+#           of the colour-difference key; it stays solid on motion-blurred limbs
 #
 # The clip is compressed 4:2:0 video, so magenta bleeds a few pixels into every edge and
-# fast moves are motion-blurred. Per frame: build a colour-difference matte from
-# "magenta-ness" (min(R,B) - G), drop specks and faint smears, choke away the outermost
-# contaminated ring, then repaint the remaining rim with colour pulled from cleaner pixels
-# further inside (edge colour extension), despill whatever magenta is left near the edge and
-# ease the pink bounce light on skin and the bow back to warm tones.
-import sys, glob, os
+# fast moves are motion-blurred. Per frame: build the matte, drop specks and faint smears,
+# choke away the outermost contaminated ring, then repaint the remaining rim with colour
+# pulled from cleaner pixels further inside (edge colour extension), despill whatever magenta
+# is left near the edge and ease the pink bounce light on skin and the bow back to warm tones.
+import argparse, glob, os
 import numpy as np
 import cv2
 from PIL import Image
@@ -30,7 +31,19 @@ def blur_fill(values, mask, sigmas=(2.5, 6, 16, 40)):
     return out
 
 
-def key(rgb):
+def colour_matte(mag, mb):
+    # opaque below 12% of the backdrop's magenta-ness, clear above 78%
+    lo, hi = .12 * mb, .78 * mb
+    return np.clip((hi - mag) / (hi - lo), 0, 1)
+
+
+def ai_matte(ai, mag, mb):
+    # segmentation shape, minus the clearly magenta pixels it overshoots into
+    a = ai.astype(np.float32) / 255 * (1 - np.clip((mag - .45 * mb) / (.25 * mb), 0, 1))
+    return np.clip((a - .2) / .6, 0, 1)
+
+
+def key(rgb, ai=None):
     C = rgb.astype(np.float32) / 255.0
     mag = np.minimum(C[..., 0], C[..., 2]) - C[..., 1]
 
@@ -39,9 +52,7 @@ def key(rgb):
     b0 = np.median(edge[em > .5], axis=0)
     mb = min(b0[0], b0[2]) - b0[1]
 
-    # colour-difference matte: opaque below 12% of the backdrop's magenta-ness, clear above 78%
-    lo, hi = .12 * mb, .78 * mb
-    a = np.clip((hi - mag) / (hi - lo), 0, 1)
+    a = colour_matte(mag, mb) if ai is None else ai_matte(ai, mag, mb)
 
     # drop specks and faint motion smears that are not attached to the character
     solid = (a > .5).astype(np.uint8)
@@ -94,14 +105,25 @@ def key(rgb):
 
 
 if __name__ == '__main__':
-    src, dst = sys.argv[1], sys.argv[2]
-    count = int(sys.argv[3]) if len(sys.argv) > 3 else 90
-    height = int(sys.argv[4]) if len(sys.argv) > 4 else 700
-    os.makedirs(dst, exist_ok=True)
-    frames = sorted(glob.glob(os.path.join(src, 'raw_*.png')))[:count]
-    keyed = [key(np.asarray(Image.open(f).convert('RGB'))) for f in frames]
-    if len(sys.argv) > 5:
-        box = tuple(int(v) for v in sys.argv[5].split(','))
+    ap = argparse.ArgumentParser()
+    ap.add_argument('frames'); ap.add_argument('out')
+    ap.add_argument('--count', type=int, default=90)
+    ap.add_argument('--height', type=int, default=700)
+    ap.add_argument('--box')
+    ap.add_argument('--ai')
+    args = ap.parse_args()
+    os.makedirs(args.out, exist_ok=True)
+    session = None
+    if args.ai:
+        from rembg import new_session, remove
+        session = new_session(args.ai)
+    keyed = []
+    for f in sorted(glob.glob(os.path.join(args.frames, 'raw_*.png')))[:args.count]:
+        im = Image.open(f).convert('RGB')
+        ai = np.asarray(remove(im, session=session, only_mask=True)) if session else None
+        keyed.append(key(np.asarray(im), ai))
+    if args.box:
+        box = tuple(int(v) for v in args.box.split(','))
     else:
         box = None
         for k in keyed:
@@ -112,6 +134,6 @@ if __name__ == '__main__':
         box = (max(0, box[0] - pad), max(0, box[1] - pad), box[2] + pad, box[3] + pad)
     for i, k in enumerate(keyed):
         im = Image.fromarray(k, 'RGBA').crop(box)
-        im = im.resize((round(im.width * height / im.height), height), Image.LANCZOS)
-        im.save(os.path.join(dst, f'm_{i:03d}.png'))
+        im = im.resize((round(im.width * args.height / im.height), args.height), Image.LANCZOS)
+        im.save(os.path.join(args.out, f'm_{i:03d}.png'))
     print('keyed', len(keyed), 'box', box)

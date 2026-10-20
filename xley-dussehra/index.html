@@ -33,23 +33,24 @@ const VIL = [
 ];
 const TAPE = 'HAPPY DUSSEHRA ✦ BURN THE GUESSWORK ✦ NOT THE BUDGET ✦ CREATORS EARN ✦ BRANDS GROW ✦ ';
 
-// ---- timing (s)
-const T_REL = 1.45, T_SPLIT = 2.55, PAN0 = 1.6, PAN1 = 2.55;
-const HIT0 = 3.0, HSTEP = 0.32;
+// ---- timing (s): everything sits on the soundtrack's beat grid (115 BPM)
+const BEAT = 0.52, beat = b => b * BEAT;
+const T_REL = beat(3), T_SPLIT = beat(5), PAN0 = 1.68, PAN1 = 2.62;
+const HIT0 = beat(6), HSTEP = BEAT;  // ten hits, one per beat
 const hitT = i => HIT0 + HSTEP * i;
-const TC0 = 6.15, TC1 = 6.85;      // embers gather into a ring
-const TX0 = 7.2, TX1 = 7.6;        // ring bursts open into the light end card
-const TE = 7.75;                   // mascot
+const TC0 = 8.06, TC1 = 8.7;       // embers gather into a ring
+const TX0 = beat(18), TX1 = 9.72;  // ring bursts open into the light end card
+const TE = 9.9;                    // mascot
 
 // ---- layout (world coords; the camera pans one screen to the right)
 const RAM = {x: 170, y: 225, h: 870, nock: [0.45, 0.355], tip: [1.0, 0.345]};
 const SPX = W + 300, SPY = 540;               // split node
 const HXS = 1150;                             // head column, screen x
-const Y0 = 688, SP = 185, V = 360, HH = 165;   // scroller
+const Y0 = 751, SP = 180, V = 210, HH = 160;   // scroller
 const headY = (i, t) => Y0 - SP * i + V * (t - T_SPLIT);
 const RING = {x: 960, y: 540, r: 150};
 const LOGO = {cx: 960, cy: 285, w: 600, dot: [0.0729, 0.804, 0.0605, 0.0338]}; // dot: cx, cy (fractions), outer r, inner r (fraction of width)
-const MASCOT = {cx: 1640, bottom: 1095, h: 680, fps: 30, offset: 6, frames: 80};
+const MASCOT = {cx: 1630, bottom: 893, h: 610, fps: 30, offset: 6, frames: 80};  // dancing on top of the ticker tape
 
 // ---- helpers
 const S = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
@@ -165,7 +166,7 @@ function background(t, cam) {
 }
 
 function guides(t, cam) {
-  const a = .12 * S(t, .05, .6) * (1 - S(t, 6.0, 6.4));
+  const a = .12 * S(t, .05, .6) * (1 - S(t, 8.2, 8.6));
   if (a <= 0) return;
   X.save(); X.strokeStyle = `rgba(243,243,238,${a})`; X.lineWidth = 1.2;
   const grow = eo(S(t, .05, .7));
@@ -210,50 +211,101 @@ const ramBox = () => { const im = IMG.ram; const h = RAM.h, w = im ? h * im.widt
 const nockPt = () => { const b = ramBox(); return [b.x + b.w * RAM.nock[0], b.y + b.h * RAM.nock[1]]; };
 const tipPt = () => { const b = ramBox(); return [b.x + b.w * RAM.tip[0], b.y + b.h * RAM.tip[1]]; };
 
-function arrowHead(x, y, ang, s, a) {
-  X.save(); X.translate(x, y); X.rotate(ang); X.globalAlpha = a;
-  X.fillStyle = INK; X.beginPath(); X.moveTo(s, 0); X.lineTo(-s * .7, -s * .55); X.lineTo(-s * .35, 0); X.lineTo(-s * .7, s * .55); X.closePath(); X.fill();
+// the glowing arrow: white shaft and head, lime fletching
+function energyArrow(x, y, ang, len, s, a) {
+  X.save(); X.translate(x, y); X.rotate(ang); X.globalAlpha = a; X.lineCap = 'round';
+  X.shadowColor = LIME; X.shadowBlur = 22 * s;
+  X.strokeStyle = INK; X.lineWidth = 3.5 * s;
+  X.beginPath(); X.moveTo(-len, 0); X.lineTo(-8 * s, 0); X.stroke();
+  X.fillStyle = INK;
+  X.beginPath(); X.moveTo(18 * s, 0); X.lineTo(-14 * s, -10 * s); X.lineTo(-7 * s, 0); X.lineTo(-14 * s, 10 * s); X.closePath(); X.fill();
+  X.strokeStyle = LIME; X.lineWidth = 3 * s;
+  for (const k of [0, 12]) for (const d of [-1, 1]) { X.beginPath(); X.moveTo(-len + (k + 10) * s, 0); X.lineTo(-len + (k - 6) * s, d * 11 * s); X.stroke(); }
   X.restore();
 }
 
-// path of the released arrow: a wiggling "signal" from the nock to the split node
-function trailPt(u, t) {
-  const [nx, ny] = nockPt();
-  const x = lerp(nx, SPX, u);
-  const k = u * u * (3 - 2 * u);
-  const env = Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.15)), 1.5) * (1 - .75 * S(t, 2.6, 3.4));
-  const y = lerp(ny, SPY, k) + 40 * Math.sin(2 * Math.PI * (6 * u - 1.4 * t)) * env;
-  return [x, y];
+// flight path from the nock to the split node; the line left behind wiggles like the reference's "signal"
+const basePt = u => { const [nx, ny] = nockPt(); return [lerp(nx, SPX, u), lerp(ny, SPY, u * u * (3 - 2 * u))]; };
+function trailPt(u, t, uHead) {
+  const [x, y] = basePt(u);
+  const env = Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.15)), 1.5) * (1 - .75 * S(t, 2.7, 3.5)) * Math.min(1, Math.max(0, (uHead - u) / .08));
+  return [x, y + 28 * Math.sin(2 * Math.PI * (6 * u - 1.4 * t)) * env];
+}
+
+const flightE = t => eo(S(t, T_REL, T_REL + .78));
+function arrowHeadPt(t) {
+  const [nx] = nockPt(), [tx] = tipPt();
+  const u = (lerp(tx, SPX, flightE(t)) - nx) / (SPX - nx);
+  const p = basePt(u), q = basePt(Math.max(0, u - .004));
+  return {x: p[0], y: p[1], ang: Math.atan2(p[1] - q[1], p[0] - q[0]), u};
 }
 
 function arrow(t) {
   const [nx, ny] = nockPt(), [tx, ty] = tipPt();
   if (t < T_REL) {
-    // nocked arrow, glowing as the bow is drawn
-    const a = eo(S(t, .55, .95)); if (a <= 0) return;
-    const pull = 1 - .06 * S(t, .6, T_REL);
-    X.save(); X.globalAlpha = a;
-    X.strokeStyle = INK; X.lineWidth = 4; X.shadowColor = LIME; X.shadowBlur = 18;
-    X.beginPath(); X.moveTo(nx, ny); X.lineTo(lerp(nx, tx, pull), ty); X.stroke();
-    X.shadowBlur = 0; X.restore();
-    arrowHead(lerp(nx, tx, pull) + 6, ty, 0, 22, a);
-    glow(lerp(nx, tx, pull), ty, 70 + 40 * S(t, .8, T_REL), LIME_RGB, .55 * a);
+    // nocked: the arrow charges up as the bow is drawn
+    const a = eo(S(t, .5, .9)); if (a <= 0) return;
+    const hx = lerp(nx, tx, 1 - .07 * eio(S(t, .55, T_REL))), c = S(t, .5, T_REL);
+    X.save(); X.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 28; k++) {
+      const b = .5 + R(k + 500) * .75, u = (t - b) / .45;
+      if (u <= 0 || u >= 1) continue;
+      const an = R(k + 520) * Math.PI * 2, r = (130 + R(k + 540) * 150) * (1 - eio(u));
+      glow(hx + Math.cos(an) * r, ty + Math.sin(an) * r, 10, LIME_RGB, .9 * Math.sin(Math.PI * u));
+    }
+    X.strokeStyle = `rgba(${LIME_RGB},${.55 * c})`; X.lineWidth = 2;
+    X.beginPath(); X.arc(hx, ty, lerp(130, 20, ei(c)), 0, 7); X.stroke();
+    glow(hx, ty, 60 + 80 * c, LIME_RGB, .3 + .55 * c);
+    X.restore();
+    energyArrow(hx, ty, 0, hx - nx, 1, a);
     return;
   }
-  const e = eo(S(t, T_REL, 2.25));
-  const headX = lerp(tx, SPX, e);
-  const uHead = (headX - nx) / (SPX - nx);
-  const fade = 1 - .6 * S(t, 3.0, 3.6) - .4 * S(t, 6.2, 6.7);
+  // release: flash, shock rings and rays at the bow
+  const ru = S(t, T_REL, T_REL + .45);
+  if (ru < 1) {
+    X.save(); X.globalCompositeOperation = 'lighter';
+    glow(tx, ty, 40 + 230 * eo(ru), '255,255,240', 1 - ru);
+    for (const [d, lw] of [[0, 5], [.08, 3]]) {
+      const v = S(t, T_REL + d, T_REL + d + .4);
+      if (v > 0 && v < 1) { X.strokeStyle = `rgba(${LIME_RGB},${1 - v})`; X.lineWidth = lw * (1 - v) + 1; X.beginPath(); X.arc(tx, ty, 30 + 320 * eo(v), 0, 7); X.stroke(); }
+    }
+    for (let k = 0; k < 12; k++) {
+      const an = k * Math.PI / 6 + .2, r1 = 50 + 280 * eo(ru), r0 = r1 * .55;
+      X.strokeStyle = `rgba(250,255,225,${.8 * (1 - ru)})`; X.lineWidth = 3;
+      X.beginPath(); X.moveTo(tx + Math.cos(an) * r0, ty + Math.sin(an) * r0); X.lineTo(tx + Math.cos(an) * r1, ty + Math.sin(an) * r1); X.stroke();
+    }
+    X.restore();
+  }
+  // the energy line it leaves behind
+  const h = arrowHeadPt(t);
+  const fade = 1 - .6 * S(t, 3.1, 3.7) - .4 * S(t, 8.2, 8.6);
   X.save(); X.globalAlpha = fade;
   X.strokeStyle = INK; X.lineWidth = 3; X.shadowColor = LIME; X.shadowBlur = 14; X.lineJoin = 'round';
   X.beginPath();
   const n = 220;
-  for (let k = 0; k <= n; k++) { const p = trailPt(uHead * k / n, t); k ? X.lineTo(p[0], p[1]) : X.moveTo(p[0], p[1]); }
+  for (let k = 0; k <= n; k++) { const p = trailPt(h.u * k / n, t, h.u); k ? X.lineTo(p[0], p[1]) : X.moveTo(p[0], p[1]); }
   X.stroke(); X.shadowBlur = 0; X.restore();
-  const hp = trailPt(uHead, t), hp2 = trailPt(Math.max(0, uHead - .006), t);
-  if (t < T_SPLIT) {
-    arrowHead(hp[0] + 4, hp[1], Math.atan2(hp[1] - hp2[1], hp[0] - hp2[0]), 26, 1);
-    X.save(); X.globalCompositeOperation = 'lighter'; glow(hp[0], hp[1], 46, LIME_RGB, .8); X.restore();
+  // sparks shed along the flight
+  X.save(); X.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 54; k++) {
+    const te = T_REL + k * .016, age = t - te, u = age / .55;
+    if (age <= 0 || u >= 1) continue;
+    const p = arrowHeadPt(te), sp = 60 + R(k + 700) * 120, side = (R(k + 720) - .5) * 140;
+    const x = p.x - Math.cos(p.ang) * sp * age - Math.sin(p.ang) * side * age;
+    const y = p.y - Math.sin(p.ang) * sp * age + Math.cos(p.ang) * side * age + 60 * age * age;
+    glow(x, y, 4 + R(k + 740) * 5, k % 3 ? LIME_RGB : '250,255,225', 1 - u);
+  }
+  X.restore();
+  if (t < T_SPLIT + .2) {
+    // comet tail, then the arrow; it swells and bursts as it reaches the split
+    const inflate = S(t, T_SPLIT - .06, T_SPLIT + .2);
+    X.save(); X.globalCompositeOperation = 'lighter';
+    for (let j = 1; j <= 14; j++) {
+      const q = arrowHeadPt(Math.max(T_REL, t - j * .012));
+      glow(q.x, q.y, 22 - j * 1.2, LIME_RGB, (.55 - j * .035) * (1 - inflate));
+    }
+    X.restore();
+    energyArrow(h.x, h.y, h.ang, 150, 1.1 + 1.2 * inflate, 1 - inflate);
   }
   // speed streaks at release
   const rs = S(t, T_REL, T_REL + .5);
@@ -264,7 +316,7 @@ function arrow(t) {
 }
 
 function splitNode(t) {
-  const a = S(t, 2.0, T_SPLIT) * (1 - S(t, 6.0, 6.4)); if (a <= 0) return;
+  const a = S(t, 2.0, T_SPLIT) * (1 - S(t, 8.2, 8.6)); if (a <= 0) return;
   const p = 1 + .15 * Math.sin(t * 9);
   X.save(); X.globalCompositeOperation = 'lighter';
   glow(SPX, SPY, 95 * p, LIME_RGB, .85 * a); glow(SPX, SPY, 24, '250,255,225', a);
@@ -282,7 +334,7 @@ function headState(i, t) {
 
 function branches(t) {
   if (t < T_SPLIT - .02) return;
-  const fade = 1 - S(t, 6.05, 6.45);
+  const fade = 1 - S(t, 8.2, 8.6);
   for (let i = 0; i < 10; i++) {
     const th = hitT(i), si = T_SPLIT + .035 * i;
     if (t < si) continue;
@@ -301,15 +353,17 @@ function branches(t) {
     X.stroke(); X.shadowBlur = 0; X.restore();
     if (t < th) {
       const q = bez(P0, P1, P2, P3, p), q2 = bez(P0, P1, P2, P3, Math.max(0, p - .02));
-      arrowHead(q[0], q[1], Math.atan2(q[1] - q2[1], q[0] - q2[0]), 18, fade);
-      X.save(); X.globalCompositeOperation = 'lighter'; glow(q[0], q[1], 26, LIME_RGB, .8 * fade); X.restore();
+      X.save(); X.globalCompositeOperation = 'lighter';
+      for (let j = 1; j <= 6; j++) { const c = bez(P0, P1, P2, P3, Math.max(0, p - j * .025)); glow(c[0], c[1], 16 - j * 2, LIME_RGB, (.5 - j * .07) * fade); }
+      X.restore();
+      energyArrow(q[0], q[1], Math.atan2(q[1] - q2[1], q[0] - q2[0]), 40, .62, fade);
     }
   }
 }
 
 function heads(t) {
   if (t < 1.4) return;
-  const sceneA = 1 - S(t, 6.1, 6.5);
+  const sceneA = 1 - S(t, 8.25, 8.65);
   for (let i = 9; i >= 0; i--) {
     const im = i % 2 ? IMG.r2 : IMG.r1; if (!im) continue;
     const hs = headState(i, t), th = hitT(i);
@@ -393,7 +447,7 @@ function emberPos(i, t) {
 }
 
 function embers(t) {
-  const fade = 1 - S(t, 7.0, 7.2);
+  const fade = 1 - S(t, 9.2, 9.36);
   X.save();
   for (let i = 0; i < 10; i++) {
     const th = hitT(i); if (t < th + .2) continue;
@@ -406,7 +460,7 @@ function embers(t) {
 }
 
 function hud(t) {
-  const a = eo(S(t, 2.3, 2.8)) * (1 - S(t, 6.0, 6.35)); if (a <= 0) return;
+  const a = eo(S(t, 2.3, 2.8)) * (1 - S(t, 8.15, 8.5)); if (a <= 0) return;
   let n = 0; for (let i = 0; i < 10; i++) if (t >= hitT(i)) n++;
   const pulse = n && t - hitT(n - 1) < .25 ? 1 - S(t, hitT(n - 1), hitT(n - 1) + .25) : 0;
   X.save(); X.globalAlpha = a;
@@ -425,7 +479,7 @@ function hud(t) {
 
 function ringPhase(t) {
   if (t < TC0 || t >= TX0) return;
-  const ta = eo(S(t, 6.5, 6.85)) * (1 - S(t, 7.1, 7.2));
+  const ta = eo(S(t, 8.45, 8.8)) * (1 - S(t, 9.22, 9.34));
   if (ta > 0) {
     X.save(); X.globalAlpha = ta;
     text('BURN THE GUESSWORK,', RING.x, RING.y - RING.r - 125 + 24 * (1 - ta), '800 104px Barlow', INK, 'center', 1);
@@ -433,7 +487,7 @@ function ringPhase(t) {
     text('NOT THE BUDGET.', RING.x, RING.y + RING.r + 125 - 24 * (1 - ta), '800 104px Barlow', LIME, 'center', 1);
     X.restore();
   }
-  const rs = eo(S(t, 6.8, 7.1));
+  const rs = eo(S(t, 8.7, 9.0));
   if (rs > 0) {
     X.save();
     X.globalCompositeOperation = 'lighter'; glow(RING.x, RING.y, RING.r * 1.9, LIME_RGB, .3 * rs); X.globalCompositeOperation = 'source-over';
@@ -458,8 +512,8 @@ function endCard(t) {
   const logo = IMG.logoBlk; if (!logo) return;
   const w = LOGO.w, h = w * logo.height / logo.width, x = LOGO.cx - w / 2, y = LOGO.cy - h / 2;
   // the logo's orange dot pops first, then the wordmark wipes out of it
-  const dp = eob(S(t, 7.55, 7.85));
-  const wipe = eo(S(t, 7.7, 8.15));
+  const dp = eob(S(t, 9.68, 9.98));
+  const wipe = eo(S(t, 9.82, 10.27));
   if (dp > 0 && wipe < .2) {
     const dx = x + w * LOGO.dot[0], dy = y + h * LOGO.dot[1];
     X.fillStyle = BLK; X.beginPath(); X.arc(dx, dy, w * LOGO.dot[2] * dp, 0, 7); X.fill();
@@ -467,7 +521,7 @@ function endCard(t) {
   }
   if (wipe > 0) { X.save(); X.beginPath(); X.rect(x - 10, y - 10, (w + 20) * wipe, h + 20); X.clip(); X.drawImage(logo, x, y, w, h); X.restore(); }
   // HAPPY [DUSSEHRA]
-  const l1 = eo(S(t, 7.95, 8.3)), hb = eo(S(t, 8.05, 8.4)), l2 = eo(S(t, 8.15, 8.5)), l3 = eo(S(t, 8.25, 8.6));
+  const l1 = eo(S(t, 10.08, 10.43)), hb = eo(S(t, 10.18, 10.53)), l2 = eo(S(t, 10.28, 10.63)), l3 = eo(S(t, 10.38, 10.73));
   const hf = '800 132px Barlow';
   const w1 = measure('HAPPY ', hf, 1), w2 = measure('DUSSEHRA', hf, 1), pad = 22;
   const x0 = LOGO.cx - (w1 + w2 + pad * 2) / 2, hy = 515 + 22 * (1 - l1);
@@ -483,11 +537,11 @@ function endCard(t) {
   text(pt, LOGO.cx + 2, py + 1, pf, LIME, 'center', 5);
   X.restore();
   // scrolling ticker tape
-  const tp = eo(S(t, 8.1, 8.5));
+  const tp = eo(S(t, 10.22, 10.62));
   if (tp > 0) {
     X.save(); X.translate(W / 2, 930 + 120 * (1 - tp)); X.rotate(-.035);
     X.fillStyle = LIME; X.fillRect(-W, -34, W * 2, 68);
-    const tf = '800 40px Barlow', tw = measure(TAPE, tf, 1), off = -((t - 8.1) * 170) % tw;
+    const tf = '800 40px Barlow', tw = measure(TAPE, tf, 1), off = -((t - 10.22) * 170) % tw;
     for (let k = -2; k < 3; k++) text(TAPE, -W + off + k * tw, 2, tf, BLK, 'left', 1);
     X.restore();
   }
@@ -507,7 +561,7 @@ function mascot(t) {
 // quick RGB-slice glitch on the big transitions (Xley promo style)
 function glitch(t) {
   let a = 0;
-  for (const g of [1.62, 7.62]) a = Math.max(a, 1 - Math.abs(t - g) / .09);
+  for (const g of [1.74, 9.74]) a = Math.max(a, 1 - Math.abs(t - g) / .09);
   if (a <= 0) return;
   const seed = Math.floor(t * 30);
   for (let k = 0; k < 10; k++) {
@@ -527,7 +581,11 @@ function draw(t) {
   guides(t, cam);
   // slow push-in while the bow is drawn, released as the camera pans
   const zoom = 1 + .05 * eo(S(t, 0, T_REL)) * (1 - eio(S(t, T_REL, 2.3)));
-  X.save(); X.translate(W / 2, H / 2); X.scale(zoom, zoom); X.translate(-W / 2 - cam, -H / 2);
+  // camera shake on the release and on every hit
+  let shake = t >= T_REL ? 14 * (1 - S(t, T_REL, T_REL + .3)) : 0;
+  for (let i = 0; i < 10; i++) if (t >= hitT(i)) shake = Math.max(shake, 6 * (1 - S(t, hitT(i), hitT(i) + .18)));
+  const sx = Math.sin(t * 95) * shake, sy = Math.cos(t * 83) * shake * .6;
+  X.save(); X.translate(W / 2 + sx, H / 2 + sy); X.scale(zoom, zoom); X.translate(-W / 2 - cam, -H / 2);
   if (t < 3.2) { introText(t); ram(t); }
   arrow(t);
   branches(t);
