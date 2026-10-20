@@ -12,7 +12,7 @@ const [mode, arg] = process.argv.slice(2);
   const browser = await chromium.launch();
   const page = await browser.newPage({viewport: {width: 1920, height: 1080}, deviceScaleFactor: 1});
   page.on('console', m => console.log('page:', m.text()));
-  await page.goto(`http://127.0.0.1:${process.env.PORT || 8123}/index.html`);
+  await page.goto(`http://127.0.0.1:${process.env.PORT || 8123}/${process.env.PAGE || 'index.html'}`);
   await page.waitForFunction('window.READY === true', null, {timeout: 120000});
   const size = await page.evaluate(() => ({width: W, height: H}));
   await page.setViewportSize(size);
@@ -25,7 +25,7 @@ const [mode, arg] = process.argv.slice(2);
   } else {
     const n = Math.round((Number(arg) || 10) * FPS);
     const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-framerate', String(FPS), '-i', '-',
-      '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path.join(DIR, 'out.mp4')],
+      '-c:v', 'libx264', '-preset', 'medium', '-crf', '17', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path.join(DIR, process.env.OUT || 'out.mp4')],
       {stdio: ['pipe', 'inherit', 'inherit']});
     for (let f = 0; f < n; f++) {
       await page.evaluate(t => window.draw(t), f / FPS);

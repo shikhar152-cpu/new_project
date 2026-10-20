@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-ExtraBold.ttf);font-weight:800}
+@font-face{font-family:Jakarta;src:url(fonts/PlusJakartaSans.ttf);font-weight:200 800}
+@font-face{font-family:JBMono;src:url(fonts/JetBrainsMono.ttf);font-weight:100 800}
+html,body{margin:0;background:#000;overflow:hidden}
+canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// Instagram Story frame (1080x1920) for the 16:9 film: black background, Dussehra copy above,
+// a clear spot for an Instagram link sticker, then the tagline and diyas below, embers
+// throughout. The film itself is laid over the VIDEO area afterwards by ffmpeg, untouched.
+// Deterministic: draw(t) renders time t.
+const W = 1080, H = 1920;
+const LIME = '#CFF32C', LIME_RGB = '207,243,44', INK = '#F3F3EE', PINK = '#FF4FA3';
+const VIDEO = {y: 600, h: 608};             // where the film sits
+const BEAT = 0.52, beat = b => b * BEAT;    // same beat grid as the film's soundtrack
+const HITS = Array.from({length: 10}, (_, i) => beat(6 + i)), BURST = beat(18);
+const C = document.getElementById('c'), X = C.getContext('2d');
+
+const S = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
+const eo = x => 1 - Math.pow(1 - x, 3);
+const eob = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const R = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+function glow(x, y, r, rgb, a) {
+  const g = X.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(.35, `rgba(${rgb},${a * .45})`); g.addColorStop(1, `rgba(${rgb},0)`);
+  X.fillStyle = g; X.beginPath(); X.arc(x, y, r, 0, 7); X.fill();
+}
+
+function text(str, x, y, font, color, align = 'left', spacing = 0) {
+  X.font = font; X.fillStyle = color; X.textAlign = align; X.textBaseline = 'middle';
+  X.letterSpacing = spacing + 'px'; X.fillText(str, x, y); X.letterSpacing = '0px';
+}
+
+function measure(str, font, spacing = 0) {
+  X.font = font; X.letterSpacing = spacing + 'px'; const w = X.measureText(str).width; X.letterSpacing = '0px'; return w;
+}
+
+// how hard the soundtrack is hitting right now: a quick decay after each villain hit and the burst
+function pulse(t) {
+  let p = 0;
+  for (const h of HITS) if (t >= h) p = Math.max(p, Math.exp(-(t - h) / .18));
+  if (t >= BURST) p = Math.max(p, 1.6 * Math.exp(-(t - BURST) / .4));
+  return p;
+}
+
+function background(t) {
+  X.fillStyle = '#000'; X.fillRect(0, 0, W, H);
+  // the film spills a little lime light into the black, breathing with the beat
+  const cy = VIDEO.y + VIDEO.h / 2, p = pulse(t);
+  X.save(); X.translate(W / 2, cy); X.scale(1, .75);
+  glow(0, 0, 820, LIME_RGB, .07 + .06 * p);
+  X.restore();
+  // hairlines hugging the film's top and bottom edges
+  for (const y of [VIDEO.y - 2, VIDEO.y + VIDEO.h + 2]) {
+    const g = X.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, `rgba(${LIME_RGB},0)`); g.addColorStop(.5, `rgba(${LIME_RGB},${.35 + .3 * p})`); g.addColorStop(1, `rgba(${LIME_RGB},0)`);
+    X.fillStyle = g; X.fillRect(0, y - 1, W, 2);
+  }
+}
+
+// embers drifting up through the black
+function embers(t) {
+  X.save(); X.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 90; k++) {
+    const sp = 45 + R(k) * 90, span = H + 120;
+    const y = H + 60 - ((t * sp + R(k + 90) * span) % span);
+    const x = R(k + 180) * W + Math.sin(t * (.6 + R(k + 270)) + k) * 26;
+    const a = S(y, 140, 420) * (.35 + .65 * R(k + 360)) * (.75 + .25 * Math.sin(t * 6 + k));
+    glow(x, y, 3 + R(k + 450) * 5, k % 3 ? LIME_RGB : '255,170,80', .85 * a);
+  }
+  X.restore();
+}
+
+function headline(t) {
+  const a0 = eo(S(t, .1, .5)), a1 = eo(S(t, .25, .7)), a2 = eo(S(t, .4, .85)), u = eo(S(t, .75, 1.15));
+  const f = '800 104px Barlow';
+  X.save();
+  X.globalAlpha = a0; text('// HAPPY DUSSEHRA', W / 2, 300 - 14 * (1 - a0), '700 28px JBMono', LIME, 'center', 8);
+  X.globalAlpha = a1; text('THIS DUSSEHRA,', W / 2, 392 + 34 * (1 - a1), f, INK, 'center', 1);
+  X.globalAlpha = a2; X.shadowColor = LIME; X.shadowBlur = 24;
+  text('BURN THE GUESSWORK.', W / 2, 492 + 34 * (1 - a2), f, LIME, 'center', 1);
+  X.shadowBlur = 0;
+  const lw = measure('BURN THE GUESSWORK.', f, 1);
+  X.globalAlpha = 1; X.fillStyle = LIME; X.fillRect(W / 2 - lw / 2, 552, lw * u, 6);
+  for (const [x, y, k] of [[W / 2 - lw / 2 - 30, 380, 0], [W / 2 + lw / 2 + 26, 470, 1], [W / 2 + lw / 2 - 8, 330, 2]]) {
+    X.globalAlpha = a2 * (.55 + .45 * Math.sin(t * 7 + k * 2));
+    text('*', x, y, '800 46px Jakarta', k === 2 ? PINK : LIME, 'center');
+  }
+  X.restore();
+}
+
+function subline(t) {
+  const a = eo(S(t, 1.0, 1.4)), b = eo(S(t, 1.15, 1.55));
+  X.save();
+  X.globalAlpha = a; text('Creators earn. Brands grow.', W / 2, 1462 + 16 * (1 - a), '600 36px Jakarta', 'rgba(243,243,238,.78)', 'center');
+  X.globalAlpha = b; text('@XLEY.AI', W / 2, 1514 + 16 * (1 - b), '700 26px JBMono', LIME, 'center', 6);
+  X.restore();
+}
+
+// a row of diyas with flickering flames
+function diyas(t) {
+  const n = 5, gap = 150, x0 = W / 2 - gap * (n - 1) / 2, y = 1630;
+  for (let i = 0; i < n; i++) {
+    const a = eob(S(t, 1.3 + i * .1, 1.75 + i * .1)); if (a <= 0) continue;
+    const x = x0 + i * gap;
+    X.save(); X.translate(x, y); X.scale(a, a);
+    const fl = 1 + .12 * Math.sin(t * 13 + i * 2.1) + .08 * Math.sin(t * 23 + i);
+    X.globalCompositeOperation = 'lighter';
+    glow(0, -30, 70 * fl, '255,170,60', .35);
+    X.globalCompositeOperation = 'source-over';
+    // flame
+    const fh = 46 * fl;
+    const fg = X.createLinearGradient(0, -fh - 12, 0, -10);
+    fg.addColorStop(0, 'rgba(255,240,180,0)'); fg.addColorStop(.35, '#FFD86B'); fg.addColorStop(1, '#FF8A2A');
+    X.fillStyle = fg;
+    X.beginPath(); X.moveTo(0, -fh - 12); X.quadraticCurveTo(15, -30, 0, -10); X.quadraticCurveTo(-15, -30, 0, -fh - 12); X.fill();
+    // bowl
+    const bg = X.createLinearGradient(0, -12, 0, 24);
+    bg.addColorStop(0, LIME); bg.addColorStop(1, '#6E8F12');
+    X.fillStyle = bg;
+    X.beginPath(); X.moveTo(-44, -10); X.quadraticCurveTo(0, 46, 44, -10); X.closePath(); X.fill();
+    X.fillStyle = '#E9FF8A'; X.fillRect(-46, -14, 92, 6);
+    X.restore();
+  }
+}
+
+function draw(t) {
+  X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha = 1; X.globalCompositeOperation = 'source-over'; X.shadowBlur = 0;
+  background(t);
+  embers(t);
+  headline(t);
+  subline(t);
+  diyas(t);
+  // keep the film's area clean: ffmpeg lays the untouched 16:9 film here
+  X.fillStyle = '#000'; X.fillRect(0, VIDEO.y, W, VIDEO.h);
+}
+window.draw = draw;
+
+(async () => {
+  await Promise.all(['800 104px Barlow', '600 36px Jakarta', '800 46px Jakarta', '700 26px JBMono'].map(f => document.fonts.load(f)));
+  draw(0);
+  window.READY = true;
+})();
+</script>
+</body>
+</html>
