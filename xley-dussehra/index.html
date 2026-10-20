@@ -1,0 +1,562 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face{font-family:Barlow;src:url(fonts/BarlowCondensed-ExtraBold.ttf);font-weight:800}
+@font-face{font-family:Jakarta;src:url(fonts/PlusJakartaSans.ttf);font-weight:200 800}
+@font-face{font-family:JBMono;src:url(fonts/JetBrainsMono.ttf);font-weight:100 800}
+html,body{margin:0;background:#000;overflow:hidden}
+canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Xley — Happy Dussehra motion graphic. 1920x1080 (16:9) in the Xley palette (lime / black / off-white).
+// Deterministic: draw(t) renders time t (seconds).
+const W = 1920, H = 1080;
+const LIME = '#CFF32C', LIME_RGB = '207,243,44', INK = '#F3F3EE', LIGHT = '#F3F3EE', BLK = '#0A0A0A', DOT = '#E6813B', PINK = '#FF4FA3';
+const C = document.getElementById('c'), X = C.getContext('2d');
+
+const VIL = [
+  ['Fake followers', 'bought, not earned'],
+  ['Ghosting', 'seen 3 days ago'],
+  ['Late payments', 'net-90, again'],
+  ['Wrong fit', 'brand ≠ creator'],
+  ['Guesswork', 'spray & pray'],
+  ['Endless DMs', '48 unread'],
+  ['Zero reach', '0.2% engagement'],
+  ['Bad briefs', 'brief_final_v7.pdf'],
+  ['Hidden middlemen', '30% cut, somewhere'],
+  ['Wasted budget', '₹ gone, zero ROI'],
+];
+const TAPE = 'HAPPY DUSSEHRA ✦ BURN THE GUESSWORK ✦ NOT THE BUDGET ✦ CREATORS EARN ✦ BRANDS GROW ✦ ';
+
+// ---- timing (s)
+const T_REL = 1.45, T_SPLIT = 2.55, PAN0 = 1.6, PAN1 = 2.55;
+const HIT0 = 3.0, HSTEP = 0.32;
+const hitT = i => HIT0 + HSTEP * i;
+const TC0 = 6.15, TC1 = 6.85;      // embers gather into a ring
+const TX0 = 7.2, TX1 = 7.6;        // ring bursts open into the light end card
+const TE = 7.75;                   // mascot
+
+// ---- layout (world coords; the camera pans one screen to the right)
+const RAM = {x: 170, y: 225, h: 870, nock: [0.45, 0.355], tip: [1.0, 0.345]};
+const SPX = W + 300, SPY = 540;               // split node
+const HXS = 1150;                             // head column, screen x
+const Y0 = 688, SP = 185, V = 360, HH = 165;   // scroller
+const headY = (i, t) => Y0 - SP * i + V * (t - T_SPLIT);
+const RING = {x: 960, y: 540, r: 150};
+const LOGO = {cx: 960, cy: 285, w: 600, dot: [0.0729, 0.804, 0.0605, 0.0338]}; // dot: cx, cy (fractions), outer r, inner r (fraction of width)
+const MASCOT = {cx: 1640, bottom: 1095, h: 680, fps: 30, offset: 6, frames: 80};
+
+// ---- helpers
+const S = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eo = x => 1 - Math.pow(1 - x, 3);
+const ei = x => x * x * x;
+const eob = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const R = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const bez = (p0, p1, p2, p3, u) => { const v = 1 - u; return [v*v*v*p0[0] + 3*v*v*u*p1[0] + 3*v*u*u*p2[0] + u*u*u*p3[0], v*v*v*p0[1] + 3*v*v*u*p1[1] + 3*v*u*u*p2[1] + u*u*u*p3[1]]; };
+
+const IMG = {};
+function load(name, src) {
+  return new Promise(res => { const i = new Image(); i.onload = () => { IMG[name] = i; res(); }; i.onerror = () => { console.log('missing ' + src); res(); }; i.src = src; });
+}
+
+function glow(x, y, r, rgb, a) {
+  const g = X.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(.35, `rgba(${rgb},${a * .45})`); g.addColorStop(1, `rgba(${rgb},0)`);
+  X.fillStyle = g; X.beginPath(); X.arc(x, y, r, 0, 7); X.fill();
+}
+
+function text(str, x, y, font, color, align = 'left', spacing = 0) {
+  X.font = font; X.fillStyle = color; X.textAlign = align; X.textBaseline = 'middle';
+  X.letterSpacing = spacing + 'px'; X.fillText(str, x, y); X.letterSpacing = '0px';
+}
+
+function measure(str, font, spacing = 0) {
+  X.font = font; X.letterSpacing = spacing + 'px'; const w = X.measureText(str).width; X.letterSpacing = '0px'; return w;
+}
+
+// ---- small line icons for each villain
+function icon(i, x, y, s, color) {
+  X.save(); X.translate(x, y);
+  X.strokeStyle = color; X.fillStyle = color; X.lineWidth = Math.max(1.6, s * .07); X.lineCap = 'round'; X.lineJoin = 'round';
+  const r = s / 2;
+  const circleGlyph = g => { X.beginPath(); X.arc(0, 0, r * .92, 0, 7); X.stroke(); X.font = `700 ${s * .55}px Jakarta`; X.textAlign = 'center'; X.textBaseline = 'middle'; X.fillText(g, 0, s * .03); };
+  X.beginPath();
+  switch (i) {
+    case 0: X.arc(0, -r * .35, r * .32, 0, 7); X.moveTo(-r * .7, r * .8); X.quadraticCurveTo(-r * .7, r * .05, 0, r * .05); X.quadraticCurveTo(r * .7, r * .05, r * .7, r * .8);
+      X.moveTo(r * .55, -r * .95); X.lineTo(r * .95, -r * .55); X.moveTo(r * .95, -r * .95); X.lineTo(r * .55, -r * .55); X.stroke(); break;
+    case 1: X.moveTo(-r * .7, r * .85); X.lineTo(-r * .7, -r * .1); X.arc(0, -r * .1, r * .7, Math.PI, 0); X.lineTo(r * .7, r * .85);
+      for (let k = 0; k < 3; k++) { const x0 = r * .7 - k * r * .467; X.quadraticCurveTo(x0 - r * .117, r * .55, x0 - r * .233, r * .85); X.quadraticCurveTo(x0 - r * .35, r * .55, x0 - r * .467, r * .85); }
+      X.stroke(); X.beginPath(); X.arc(-r * .25, -r * .15, r * .1, 0, 7); X.arc(r * .25, -r * .15, r * .1, 0, 7); X.fill(); break;
+    case 2: X.arc(0, 0, r * .92, 0, 7); X.moveTo(0, 0); X.lineTo(0, -r * .55); X.moveTo(0, 0); X.lineTo(r * .4, r * .25); X.stroke(); break;
+    case 3: circleGlyph('≠'); break;
+    case 4: circleGlyph('?'); break;
+    case 5: X.roundRect(-r * .9, -r * .75, r * 1.8, r * 1.3, r * .3); X.moveTo(-r * .4, r * .55); X.lineTo(-r * .55, r * .95); X.lineTo(-r * .05, r * .55); X.stroke();
+      X.beginPath(); for (let k = -1; k <= 1; k++) X.arc(k * r * .42, -r * .1, r * .09, 0, 7); X.fill(); break;
+    case 6: X.moveTo(-r * .85, -r * .85); X.lineTo(-r * .85, r * .85); X.lineTo(r * .9, r * .85); X.moveTo(-r * .6, -r * .3); X.lineTo(-r * .1, -r * .3); X.lineTo(r * .2, r * .2); X.lineTo(r * .75, r * .45); X.stroke(); break;
+    case 7: X.moveTo(-r * .65, -r * .9); X.lineTo(r * .25, -r * .9); X.lineTo(r * .65, -r * .5); X.lineTo(r * .65, r * .9); X.lineTo(-r * .65, r * .9); X.closePath();
+      X.moveTo(-r * .35, -r * .25); X.lineTo(r * .35, -r * .25); X.moveTo(-r * .35, r * .1); X.lineTo(r * .35, r * .1); X.moveTo(-r * .35, r * .45); X.lineTo(r * .1, r * .45); X.stroke(); break;
+    case 8: X.moveTo(-r * .95, 0); X.quadraticCurveTo(0, -r * .9, r * .95, 0); X.quadraticCurveTo(0, r * .9, -r * .95, 0); X.moveTo(r * .27, 0); X.arc(0, 0, r * .27, 0, 7);
+      X.moveTo(-r * .8, -r * .8); X.lineTo(r * .8, r * .8); X.stroke(); break;
+    case 9: circleGlyph('₹'); break;
+  }
+  X.restore();
+}
+
+function checkbox(x, y, s, fill, tick) {
+  X.save(); X.fillStyle = fill; X.beginPath(); X.roundRect(x, y - s / 2, s, s, s * .12); X.fill();
+  X.strokeStyle = tick; X.lineWidth = s * .14; X.lineCap = 'round'; X.lineJoin = 'round';
+  X.beginPath(); X.moveTo(x + s * .24, y + s * .02); X.lineTo(x + s * .43, y + s * .2); X.lineTo(x + s * .78, y - s * .2); X.stroke();
+  X.restore();
+}
+
+function igHandle(x, y, color) {
+  X.save(); X.strokeStyle = color; X.fillStyle = color; X.lineWidth = 2.6;
+  X.beginPath(); X.roundRect(x - 17, y - 17, 34, 34, 10); X.stroke();
+  X.beginPath(); X.arc(x, y, 8, 0, 7); X.stroke();
+  X.beginPath(); X.arc(x + 9.5, y - 9.5, 2.2, 0, 7); X.fill();
+  X.restore();
+  text('@XLEY.AI', x, y + 36, '700 15px JBMono', color, 'center', 1);
+}
+
+const bin = (k, t) => { let s = ''; for (let j = 0; j < 16; j++) { s += R(k * 97 + j * 13 + Math.floor(t * 6)) > .5 ? '1' : '0'; if (j % 4 === 3) s += ' '; } return s; };
+
+// grid, corner crosshairs, handle and code snippets from the Xley promo system
+function decor(t, light) {
+  const c = light ? '10,10,10' : '243,243,238', col = light ? BLK : INK;
+  X.save();
+  X.strokeStyle = `rgba(${c},${light ? .05 : .035})`; X.lineWidth = 1;
+  X.beginPath();
+  for (let x = 0; x <= W; x += 96) { X.moveTo(x + .5, 0); X.lineTo(x + .5, H); }
+  for (let y = 12; y <= H; y += 96) { X.moveTo(0, y + .5); X.lineTo(W, y + .5); }
+  X.stroke();
+  X.strokeStyle = `rgba(${c},.4)`; X.lineWidth = 1.5;
+  for (const [x, y] of [[150, 108], [W - 150, 108], [150, H - 108], [W - 150, H - 108]]) { X.beginPath(); X.moveTo(x - 12, y); X.lineTo(x + 12, y); X.moveTo(x, y - 12); X.lineTo(x, y + 12); X.stroke(); }
+  X.restore();
+  igHandle(W - 90, 58, col);
+  X.save(); X.globalAlpha = light ? .35 : .3;
+  for (let k = 0; k < 6; k++) text(bin(k, t), W - 380, 46 + k * 17, '500 12px JBMono', col, 'left');
+  text('POST /v1/dussehra/burn', 60, H - 66, '500 13px JBMono', col);
+  text("{ villains: 10, guesswork: 0, budget: 'safe' }", 60, H - 47, '500 13px JBMono', col);
+  X.restore();
+}
+
+// ---- scene pieces
+function background(t, cam) {
+  X.fillStyle = '#050505'; X.fillRect(0, 0, W, H);
+  const bg = IMG.bg;
+  if (bg) {
+    const w = W * 1.12, h = w * bg.height / bg.width;
+    X.filter = 'grayscale(1) contrast(1.15)'; X.drawImage(bg, -(w - W) * (cam / W), H + 40 - h, w, h); X.filter = 'none';
+    X.fillStyle = 'rgba(5,5,5,.76)'; X.fillRect(0, 0, W, H);
+  }
+  const g = X.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * .55);
+  g.addColorStop(0, `rgba(${LIME_RGB},.05)`); g.addColorStop(1, `rgba(${LIME_RGB},0)`);
+  X.fillStyle = g; X.fillRect(0, 0, W, H);
+  const v = X.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, W * .62);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.7)');
+  X.fillStyle = v; X.fillRect(0, 0, W, H);
+}
+
+function guides(t, cam) {
+  const a = .12 * S(t, .05, .6) * (1 - S(t, 6.0, 6.4));
+  if (a <= 0) return;
+  X.save(); X.strokeStyle = `rgba(243,243,238,${a})`; X.lineWidth = 1.2;
+  const grow = eo(S(t, .05, .7));
+  X.beginPath(); X.moveTo(W / 2 - W * grow, SPY); X.lineTo(W / 2 + W * grow, SPY); X.stroke();
+  const sx = SPX - cam;
+  if (sx < W + 10) { const g2 = eo(S(t, 2.2, 2.9)); X.beginPath(); X.moveTo(sx, SPY - H * g2); X.lineTo(sx, SPY + H * g2); X.stroke(); }
+  X.restore();
+}
+
+function introText(t) {
+  const cx = 1340, f = '800 84px Barlow';
+  const a1 = eo(S(t, .25, .6)), a2 = eo(S(t, .3, .7)), a3 = eo(S(t, .42, .85)), ab = eo(S(t, -.1, .5));
+  const off = lerp(24, measure('BURN THE REAL VILLAINS', f, 1) / 2 + 62, ab);
+  X.save();
+  X.save(); X.beginPath(); X.rect(cx - off + 34, 150, 2 * off - 68, 320); X.clip();
+  X.globalAlpha = a1; text('// HAPPY DUSSEHRA', cx, 222, '700 24px JBMono', LIME, 'center', 7);
+  X.globalAlpha = a2; text('BURN THE REAL VILLAINS', cx, 305 + 26 * (1 - a2), f, INK, 'center', 1);
+  X.globalAlpha = a3; text('OF CREATOR MARKETING.', cx, 392 + 26 * (1 - a3), f, LIME, 'center', 1);
+  X.restore();
+  X.globalAlpha = Math.min(1, ab * 1.6); X.shadowColor = LIME; X.shadowBlur = 34;
+  text('{', cx - off, 340, '800 190px Jakarta', LIME, 'center'); text('}', cx + off, 340, '800 190px Jakarta', LIME, 'center');
+  X.shadowBlur = 0;
+  for (const [dx, dy, k] of [[-off - 34, -120, 0], [off + 30, 132, 1], [off - 40, -128, 2]]) {
+    X.globalAlpha = ab * (.55 + .45 * Math.sin(t * 7 + k * 2));
+    text('*', cx + dx, 340 + dy, '800 44px Jakarta', k === 2 ? PINK : LIME, 'center');
+  }
+  X.restore();
+}
+
+function ram(t) {
+  const im = IMG.ram; if (!im) return;
+  const a = eo(S(t, -.35, .6));
+  const h = RAM.h * (1 + .015 * S(t, .6, T_REL)), w = h * im.width / im.height;
+  const x = RAM.x, y = RAM.y + 40 * (1 - a) + (RAM.h - h);
+  X.save(); X.globalAlpha = a;
+  glow(x + w * .5, y + h * .45, h * .55, LIME_RGB, .08 * a);
+  X.drawImage(im, x, y, w, h);
+  X.restore();
+}
+
+const ramBox = () => { const im = IMG.ram; const h = RAM.h, w = im ? h * im.width / im.height : h * .75; return {x: RAM.x, y: RAM.y, w, h}; };
+const nockPt = () => { const b = ramBox(); return [b.x + b.w * RAM.nock[0], b.y + b.h * RAM.nock[1]]; };
+const tipPt = () => { const b = ramBox(); return [b.x + b.w * RAM.tip[0], b.y + b.h * RAM.tip[1]]; };
+
+function arrowHead(x, y, ang, s, a) {
+  X.save(); X.translate(x, y); X.rotate(ang); X.globalAlpha = a;
+  X.fillStyle = INK; X.beginPath(); X.moveTo(s, 0); X.lineTo(-s * .7, -s * .55); X.lineTo(-s * .35, 0); X.lineTo(-s * .7, s * .55); X.closePath(); X.fill();
+  X.restore();
+}
+
+// path of the released arrow: a wiggling "signal" from the nock to the split node
+function trailPt(u, t) {
+  const [nx, ny] = nockPt();
+  const x = lerp(nx, SPX, u);
+  const k = u * u * (3 - 2 * u);
+  const env = Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.15)), 1.5) * (1 - .75 * S(t, 2.6, 3.4));
+  const y = lerp(ny, SPY, k) + 40 * Math.sin(2 * Math.PI * (6 * u - 1.4 * t)) * env;
+  return [x, y];
+}
+
+function arrow(t) {
+  const [nx, ny] = nockPt(), [tx, ty] = tipPt();
+  if (t < T_REL) {
+    // nocked arrow, glowing as the bow is drawn
+    const a = eo(S(t, .55, .95)); if (a <= 0) return;
+    const pull = 1 - .06 * S(t, .6, T_REL);
+    X.save(); X.globalAlpha = a;
+    X.strokeStyle = INK; X.lineWidth = 4; X.shadowColor = LIME; X.shadowBlur = 18;
+    X.beginPath(); X.moveTo(nx, ny); X.lineTo(lerp(nx, tx, pull), ty); X.stroke();
+    X.shadowBlur = 0; X.restore();
+    arrowHead(lerp(nx, tx, pull) + 6, ty, 0, 22, a);
+    glow(lerp(nx, tx, pull), ty, 70 + 40 * S(t, .8, T_REL), LIME_RGB, .55 * a);
+    return;
+  }
+  const e = eo(S(t, T_REL, 2.25));
+  const headX = lerp(tx, SPX, e);
+  const uHead = (headX - nx) / (SPX - nx);
+  const fade = 1 - .6 * S(t, 3.0, 3.6) - .4 * S(t, 6.2, 6.7);
+  X.save(); X.globalAlpha = fade;
+  X.strokeStyle = INK; X.lineWidth = 3; X.shadowColor = LIME; X.shadowBlur = 14; X.lineJoin = 'round';
+  X.beginPath();
+  const n = 220;
+  for (let k = 0; k <= n; k++) { const p = trailPt(uHead * k / n, t); k ? X.lineTo(p[0], p[1]) : X.moveTo(p[0], p[1]); }
+  X.stroke(); X.shadowBlur = 0; X.restore();
+  const hp = trailPt(uHead, t), hp2 = trailPt(Math.max(0, uHead - .006), t);
+  if (t < T_SPLIT) {
+    arrowHead(hp[0] + 4, hp[1], Math.atan2(hp[1] - hp2[1], hp[0] - hp2[0]), 26, 1);
+    X.save(); X.globalCompositeOperation = 'lighter'; glow(hp[0], hp[1], 46, LIME_RGB, .8); X.restore();
+  }
+  // speed streaks at release
+  const rs = S(t, T_REL, T_REL + .5);
+  if (rs > 0 && rs < 1) for (let k = 0; k < 9; k++) {
+    const yy = ty + (R(k + 40) - .5) * 130, len = 90 + R(k + 60) * 200, xx = lerp(tx, tx + 760, eo(rs)) - R(k) * 140;
+    X.strokeStyle = `rgba(243,243,238,${.5 * (1 - rs)})`; X.lineWidth = 2; X.beginPath(); X.moveTo(xx - len, yy); X.lineTo(xx, yy); X.stroke();
+  }
+}
+
+function splitNode(t) {
+  const a = S(t, 2.0, T_SPLIT) * (1 - S(t, 6.0, 6.4)); if (a <= 0) return;
+  const p = 1 + .15 * Math.sin(t * 9);
+  X.save(); X.globalCompositeOperation = 'lighter';
+  glow(SPX, SPY, 95 * p, LIME_RGB, .85 * a); glow(SPX, SPY, 24, '250,255,225', a);
+  X.restore();
+  const burst = S(t, T_SPLIT - .05, T_SPLIT + .35);
+  if (burst > 0 && burst < 1) { X.save(); X.strokeStyle = `rgba(${LIME_RGB},${1 - burst})`; X.lineWidth = 3; X.beginPath(); X.arc(SPX, SPY, 30 + 180 * eo(burst), 0, 7); X.stroke(); X.restore(); }
+}
+
+function headState(i, t) {
+  const y = headY(i, t), d = (y - H / 2) / (H / 2);
+  const sc = 1 - .3 * d * d;
+  const a = (1 - S(Math.abs(d), .9, 1.15)) * S(y, 115, 215);
+  return {y, sc, a};
+}
+
+function branches(t) {
+  if (t < T_SPLIT - .02) return;
+  const fade = 1 - S(t, 6.05, 6.45);
+  for (let i = 0; i < 10; i++) {
+    const th = hitT(i), si = T_SPLIT + .035 * i;
+    if (t < si) continue;
+    const hs = headState(i, t), im = i % 2 ? IMG.r2 : IMG.r1;
+    const hh = HH * hs.sc, hw = im ? hh * im.width / im.height : hh * .75;
+    const P0 = [SPX, SPY], P3 = [W + HXS - hw * .42, hs.y + hh * .05];
+    const P1 = [SPX + 280, SPY + (R(i + 3) - .5) * 560], P2 = [P3[0] - 280, P3[1] + (R(i + 7) - .5) * 150];
+    // fan out fast ("the arrow multiplies"), hover, then dart into the head at its hit time
+    const p = Math.min(1, .3 * eo(S(t, si, si + .45)) + .08 * S(t, si + .45, th - .38) + .62 * eio(S(t, th - .38, th)));
+    const after = t > th ? 1 - .8 * S(t, th + .15, th + .9) : 1;
+    const a = fade * after * (.55 + .45 * Math.min(1, hs.a + .3));
+    if (a <= 0) continue;
+    X.save(); X.globalAlpha = a; X.strokeStyle = INK; X.lineWidth = 2.2; X.shadowColor = LIME; X.shadowBlur = 8;
+    X.beginPath(); const n = 60;
+    for (let k = 0; k <= n; k++) { const q = bez(P0, P1, P2, P3, p * k / n); k ? X.lineTo(q[0], q[1]) : X.moveTo(q[0], q[1]); }
+    X.stroke(); X.shadowBlur = 0; X.restore();
+    if (t < th) {
+      const q = bez(P0, P1, P2, P3, p), q2 = bez(P0, P1, P2, P3, Math.max(0, p - .02));
+      arrowHead(q[0], q[1], Math.atan2(q[1] - q2[1], q[0] - q2[0]), 18, fade);
+      X.save(); X.globalCompositeOperation = 'lighter'; glow(q[0], q[1], 26, LIME_RGB, .8 * fade); X.restore();
+    }
+  }
+}
+
+function heads(t) {
+  if (t < 1.4) return;
+  const sceneA = 1 - S(t, 6.1, 6.5);
+  for (let i = 9; i >= 0; i--) {
+    const im = i % 2 ? IMG.r2 : IMG.r1; if (!im) continue;
+    const hs = headState(i, t), th = hitT(i);
+    if (hs.a <= 0) continue;
+    const flip = (i % 4) >= 2;
+    const hh = HH * hs.sc, hw = hh * im.width / im.height;
+    const k = S(t, th, th + .5), gone = ei(S(t, th + .25, th + .85));
+    const shake = t > th ? Math.sin(t * 90) * 10 * (1 - S(t, th, th + .3)) : 0;
+    const x = W + HXS + shake, y = hs.y;
+    const ha = hs.a * sceneA * (1 - gone);
+    // target reticle while the arrow approaches
+    const rt = S(t, th - .5, th);
+    if (rt > 0 && t < th) {
+      const rr = lerp(hw * 1.25, hw * .72, eo(rt));
+      X.save(); X.globalAlpha = hs.a * sceneA * Math.min(1, rt * 3); X.strokeStyle = LIME; X.lineWidth = 2.5;
+      X.beginPath(); X.arc(x, y, rr, 0, 7); X.stroke();
+      for (let q = 0; q < 4; q++) { const an = q * Math.PI / 2 + t * 2; X.beginPath(); X.moveTo(x + Math.cos(an) * (rr - 12), y + Math.sin(an) * (rr - 12)); X.lineTo(x + Math.cos(an) * (rr + 12), y + Math.sin(an) * (rr + 12)); X.stroke(); }
+      X.restore();
+    }
+    if (ha > 0) {
+      X.save(); X.globalAlpha = ha;
+      if (k > 0) X.filter = `brightness(${1 - .55 * k}) sepia(${.7 * k}) saturate(${1 + 1.2 * k})`;
+      X.translate(x, y); X.scale((flip ? -1 : 1) * (1 + .08 * k), 1 + .08 * k);
+      X.drawImage(im, -hw / 2, -hh / 2, hw, hh);
+      X.restore();
+    }
+    // label: icon + name + mono note; struck through and ticked once burnt
+    const la = hs.a * sceneA * (1 - .4 * S(t, th + .1, th + .4));
+    if (la > 0) {
+      const sc = hs.sc, lx = W + HXS + hw * .5 + 34, tx = lx + 54 * sc, ly = y - 13 * sc, fs = `700 ${34 * sc}px Jakarta`;
+      X.save(); X.globalAlpha = la * eo(S(t, 1.6, 2.6));
+      icon(i, lx + 19 * sc, ly, 37 * sc, INK);
+      text(VIL[i][0], tx, ly, fs, t > th ? 'rgba(243,243,238,.65)' : INK, 'left', -.3);
+      text(VIL[i][1], tx, y + 24 * sc, `500 ${18.5 * sc}px JBMono`, 'rgba(243,243,238,.45)', 'left');
+      const st = eo(S(t, th + .05, th + .3));
+      if (st > 0) {
+        const tw = measure(VIL[i][0], fs, -.3);
+        X.strokeStyle = LIME; X.lineWidth = 4 * sc; X.beginPath(); X.moveTo(tx - 4, ly); X.lineTo(tx - 4 + (tw + 8) * st, ly); X.stroke();
+        const cb = eob(S(t, th + .15, th + .45));
+        if (cb > 0) checkbox(tx + tw + 20 * sc, ly, 28 * sc * cb, LIME, BLK);
+      }
+      X.restore();
+    }
+    if (t >= th && t < th + 1.3) burn(i, t, x, y, hw, hh, hs.sc);
+  }
+}
+
+function burn(i, t, x, y, hw, hh, sc) {
+  const th = hitT(i), a0 = t - th;
+  X.save(); X.globalCompositeOperation = 'lighter';
+  const fl = S(t, th, th + .28);
+  if (fl < 1) glow(x, y, 60 + 200 * eo(fl), '255,250,225', 1 - fl);
+  const sw = S(t, th, th + .5);
+  if (sw < 1) { X.strokeStyle = `rgba(${LIME_RGB},${1 - sw})`; X.lineWidth = 6 * (1 - sw) + 1; X.beginPath(); X.arc(x, y, 50 + 200 * eo(sw), 0, 7); X.stroke(); }
+  for (let k = 0; k < 46; k++) {
+    const s = i * 131 + k, b = th + R(s) * .45, L = .45 + R(s + 1) * .45, age = t - b, u = age / L;
+    if (u <= 0 || u >= 1) continue;
+    const px = x + (R(s + 2) - .5) * hw * .85 + Math.sin(age * 9 + k) * 8;
+    const py = y + (R(s + 3) - .25) * hh * .55 - (100 + R(s + 4) * 210) * age;
+    const sz = (1 - u) * (12 + R(s + 5) * 24) * sc;
+    const rgb = u < .25 ? '255,236,190' : u < .6 ? '255,150,55' : '210,60,20';
+    glow(px, py, sz, rgb, .85 * (1 - u));
+  }
+  for (let k = 0; k < 22; k++) {
+    const s = i * 977 + k, an = R(s) * Math.PI * 2, sp = 220 + R(s + 1) * 420, L = .5 + R(s + 2) * .5, u = a0 / L;
+    if (u >= 1) continue;
+    const d = sp * (1 - Math.pow(1 - Math.min(1, a0 / L), 2)) * L * .6;
+    glow(x + Math.cos(an) * d, y + Math.sin(an) * d - 40 * a0, 7, '255,210,140', 1 - u);
+  }
+  X.restore();
+}
+
+// one lime "pixel" per burnt villain; they gather into the ring
+function emberPos(i, t) {
+  const th = hitT(i), hy = headY(i, th), age = t - th;
+  const fx = W + HXS + Math.sin(age * 2.1 + i) * 34, fy = hy - 60 * age;
+  const c = eio(S(t, TC0 + .02 * i, TC1));
+  const an = -Math.PI / 2 + i * Math.PI * 2 / 10 + 1.4 * Math.max(0, t - TC0);
+  const rx = W + RING.x + Math.cos(an) * RING.r, ry = RING.y + Math.sin(an) * RING.r;
+  return [lerp(fx, rx, c), lerp(fy, ry, c)];
+}
+
+function embers(t) {
+  const fade = 1 - S(t, 7.0, 7.2);
+  X.save();
+  for (let i = 0; i < 10; i++) {
+    const th = hitT(i); if (t < th + .2) continue;
+    const a = S(t, th + .2, th + .5) * fade; if (a <= 0) continue;
+    const [x, y] = emberPos(i, t), s = 14;
+    X.globalCompositeOperation = 'lighter'; glow(x, y, 36, LIME_RGB, .7 * a);
+    X.globalCompositeOperation = 'source-over'; X.globalAlpha = a; X.fillStyle = LIME; X.fillRect(x - s / 2, y - s / 2, s, s);
+  }
+  X.restore();
+}
+
+function hud(t) {
+  const a = eo(S(t, 2.3, 2.8)) * (1 - S(t, 6.0, 6.35)); if (a <= 0) return;
+  let n = 0; for (let i = 0; i < 10; i++) if (t >= hitT(i)) n++;
+  const pulse = n && t - hitT(n - 1) < .25 ? 1 - S(t, hitT(n - 1), hitT(n - 1) + .25) : 0;
+  X.save(); X.globalAlpha = a;
+  const band = X.createLinearGradient(0, 0, 0, 190);
+  band.addColorStop(0, 'rgba(5,5,5,.95)'); band.addColorStop(.6, 'rgba(5,5,5,.7)'); band.addColorStop(1, 'rgba(5,5,5,0)');
+  X.fillStyle = band; X.fillRect(0, 0, W, 190);
+  text('// VILLAINS OF CREATOR MARKETING', 80, 62, '700 20px JBMono', 'rgba(243,243,238,.6)', 'left', 4);
+  text('BURNT', 84, H - 262, '700 20px JBMono', 'rgba(243,243,238,.6)', 'left', 6);
+  const num = String(n).padStart(2, '0'), nf = `800 ${150 + 24 * pulse}px Barlow`;
+  X.shadowColor = LIME; X.shadowBlur = 24 * (.4 + pulse);
+  text(num, 78, H - 175, nf, LIME, 'left');
+  X.shadowBlur = 0;
+  text('/10', 78 + measure(num, nf) + 10, H - 150, '800 64px Barlow', 'rgba(243,243,238,.45)', 'left');
+  X.restore();
+}
+
+function ringPhase(t) {
+  if (t < TC0 || t >= TX0) return;
+  const ta = eo(S(t, 6.5, 6.85)) * (1 - S(t, 7.1, 7.2));
+  if (ta > 0) {
+    X.save(); X.globalAlpha = ta;
+    text('BURN THE GUESSWORK,', RING.x, RING.y - RING.r - 125 + 24 * (1 - ta), '800 104px Barlow', INK, 'center', 1);
+    X.shadowColor = LIME; X.shadowBlur = 26;
+    text('NOT THE BUDGET.', RING.x, RING.y + RING.r + 125 - 24 * (1 - ta), '800 104px Barlow', LIME, 'center', 1);
+    X.restore();
+  }
+  const rs = eo(S(t, 6.8, 7.1));
+  if (rs > 0) {
+    X.save();
+    X.globalCompositeOperation = 'lighter'; glow(RING.x, RING.y, RING.r * 1.9, LIME_RGB, .3 * rs); X.globalCompositeOperation = 'source-over';
+    const g = X.createConicGradient(t * 3, RING.x, RING.y);
+    g.addColorStop(0, LIME); g.addColorStop(.5, '#FAFFE0'); g.addColorStop(1, LIME);
+    X.lineWidth = 14; X.strokeStyle = g; X.shadowColor = LIME; X.shadowBlur = 30;
+    X.beginPath(); X.arc(RING.x, RING.y, RING.r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * rs); X.stroke();
+    X.restore();
+  }
+}
+
+// ---- light end card (revealed by the ring bursting open)
+function lightCard(t) {
+  X.fillStyle = LIGHT; X.fillRect(0, 0, W, H);
+  const v = X.createRadialGradient(W / 2, H / 2, H * .3, W / 2, H / 2, W * .65);
+  v.addColorStop(0, 'rgba(255,255,255,.5)'); v.addColorStop(1, 'rgba(0,0,0,.07)');
+  X.fillStyle = v; X.fillRect(0, 0, W, H);
+  decor(t, true);
+}
+
+function endCard(t) {
+  const logo = IMG.logoBlk; if (!logo) return;
+  const w = LOGO.w, h = w * logo.height / logo.width, x = LOGO.cx - w / 2, y = LOGO.cy - h / 2;
+  // the logo's orange dot pops first, then the wordmark wipes out of it
+  const dp = eob(S(t, 7.55, 7.85));
+  const wipe = eo(S(t, 7.7, 8.15));
+  if (dp > 0 && wipe < .2) {
+    const dx = x + w * LOGO.dot[0], dy = y + h * LOGO.dot[1];
+    X.fillStyle = BLK; X.beginPath(); X.arc(dx, dy, w * LOGO.dot[2] * dp, 0, 7); X.fill();
+    X.fillStyle = DOT; X.beginPath(); X.arc(dx, dy, w * LOGO.dot[3] * dp, 0, 7); X.fill();
+  }
+  if (wipe > 0) { X.save(); X.beginPath(); X.rect(x - 10, y - 10, (w + 20) * wipe, h + 20); X.clip(); X.drawImage(logo, x, y, w, h); X.restore(); }
+  // HAPPY [DUSSEHRA]
+  const l1 = eo(S(t, 7.95, 8.3)), hb = eo(S(t, 8.05, 8.4)), l2 = eo(S(t, 8.15, 8.5)), l3 = eo(S(t, 8.25, 8.6));
+  const hf = '800 132px Barlow';
+  const w1 = measure('HAPPY ', hf, 1), w2 = measure('DUSSEHRA', hf, 1), pad = 22;
+  const x0 = LOGO.cx - (w1 + w2 + pad * 2) / 2, hy = 515 + 22 * (1 - l1);
+  X.save(); X.globalAlpha = l1;
+  X.fillStyle = LIME; X.fillRect(x0 + w1 - 4, hy - 70, (w2 + pad * 2) * hb, 136);
+  text('HAPPY ', x0, hy + 4, hf, BLK, 'left', 1);
+  text('DUSSEHRA', x0 + w1 + pad - 4, hy + 4, hf, BLK, 'left', 1);
+  X.globalAlpha = l2;
+  text('The ultimate global creator marketplace', LOGO.cx, 638 + 18 * (1 - l2), '600 34px Jakarta', 'rgba(10,10,10,.62)', 'center');
+  X.globalAlpha = l3;
+  const pt = 'CREATORS EARN ✦ BRANDS GROW', pf = '700 24px JBMono', pw = measure(pt, pf, 5) + 80, py = 728 + 16 * (1 - l3);
+  X.fillStyle = BLK; X.beginPath(); X.roundRect(LOGO.cx - pw / 2, py - 34, pw, 68, 34); X.fill();
+  text(pt, LOGO.cx + 2, py + 1, pf, LIME, 'center', 5);
+  X.restore();
+  // scrolling ticker tape
+  const tp = eo(S(t, 8.1, 8.5));
+  if (tp > 0) {
+    X.save(); X.translate(W / 2, 930 + 120 * (1 - tp)); X.rotate(-.035);
+    X.fillStyle = LIME; X.fillRect(-W, -34, W * 2, 68);
+    const tf = '800 40px Barlow', tw = measure(TAPE, tf, 1), off = -((t - 8.1) * 170) % tw;
+    for (let k = -2; k < 3; k++) text(TAPE, -W + off + k * tw, 2, tf, BLK, 'left', 1);
+    X.restore();
+  }
+}
+
+function mascot(t) {
+  const fr = IMG.mascot; if (!fr || !fr.length) return;
+  const p = S(t, TE, TE + .5); if (p <= 0) return;
+  const idx = Math.min(fr.length - 1, Math.max(0, Math.floor((t - TE) * MASCOT.fps) + MASCOT.offset));
+  const im = fr[idx]; if (!im) return;
+  const sc = eob(p), h = MASCOT.h * sc, w = h * im.width / im.height;
+  X.save(); X.globalAlpha = Math.min(1, p * 2.5);
+  X.drawImage(im, MASCOT.cx - w / 2, MASCOT.bottom - h, w, h);
+  X.restore();
+}
+
+// quick RGB-slice glitch on the big transitions (Xley promo style)
+function glitch(t) {
+  let a = 0;
+  for (const g of [1.62, 7.62]) a = Math.max(a, 1 - Math.abs(t - g) / .09);
+  if (a <= 0) return;
+  const seed = Math.floor(t * 30);
+  for (let k = 0; k < 10; k++) {
+    const y = R(seed * 17 + k) * H, h = 8 + R(seed * 29 + k) * 70, dx = (R(seed * 43 + k) - .5) * 140 * a;
+    X.drawImage(C, 0, y, W, h, dx, y, W, h);
+  }
+  X.save(); X.globalAlpha = .9 * a; X.fillStyle = LIME;
+  for (let k = 0; k < 5; k++) X.fillRect(R(seed * 7 + k) * W * .7, R(seed * 11 + k) * H, 140 + R(seed * 13 + k) * 420, 6 + R(seed * 19 + k) * 12);
+  X.restore();
+}
+
+function draw(t) {
+  const cam = W * eio(S(t, PAN0, PAN1));
+  X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha = 1; X.globalCompositeOperation = 'source-over'; X.filter = 'none'; X.shadowBlur = 0;
+  background(t, cam);
+  decor(t, false);
+  guides(t, cam);
+  // slow push-in while the bow is drawn, released as the camera pans
+  const zoom = 1 + .05 * eo(S(t, 0, T_REL)) * (1 - eio(S(t, T_REL, 2.3)));
+  X.save(); X.translate(W / 2, H / 2); X.scale(zoom, zoom); X.translate(-W / 2 - cam, -H / 2);
+  if (t < 3.2) { introText(t); ram(t); }
+  arrow(t);
+  branches(t);
+  heads(t);
+  splitNode(t);
+  embers(t);
+  X.restore();
+  hud(t);
+  ringPhase(t);
+  if (t >= TX0) {
+    const p = ei(S(t, TX0, TX1)), rr = lerp(RING.r, 1200, p);
+    X.save(); X.beginPath(); X.arc(RING.x, RING.y, rr, 0, 7); X.clip();
+    lightCard(t); endCard(t); mascot(t);
+    X.restore();
+    if (p < 1) { X.save(); X.strokeStyle = LIME; X.lineWidth = 16 + 30 * p; X.shadowColor = LIME; X.shadowBlur = 40; X.beginPath(); X.arc(RING.x, RING.y, rr, 0, 7); X.stroke(); X.restore(); }
+  }
+  glitch(t);
+}
+window.draw = draw;
+
+(async () => {
+  const jobs = [load('bg', 'assets/bg.jpg'), load('ram', 'assets/ram.png'), load('r1', 'assets/ravan1.png'), load('r2', 'assets/ravan2.png'), load('logoBlk', 'assets/logo_black.png')];
+  IMG.mascot = [];
+  for (let k = 0; k < MASCOT.frames; k++) jobs.push(new Promise(res => { const i = new Image(); i.onload = () => { IMG.mascot[k] = i; res(); }; i.onerror = res; i.src = `assets/mascot/m_${String(k).padStart(3, '0')}.png`; }));
+  await Promise.all(jobs);
+  await Promise.all(['800 84px Barlow', '700 31px Jakarta', '600 34px Jakarta', '800 190px Jakarta', '700 24px JBMono', '500 13px JBMono'].map(f => document.fonts.load(f)));
+  draw(0);
+  window.READY = true;
+})();
+</script>
+</body>
+</html>
