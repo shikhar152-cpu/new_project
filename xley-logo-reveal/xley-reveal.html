@@ -11,13 +11,20 @@
 <body>
 <canvas id="c" width="1080" height="1920"></canvas>
 <script>
-/* Xley logo reveal, vertical 9:16. Backlit teaser style: the logo is a black
-   silhouette lit from behind by a pink-to-orange rim glow. It slowly pulls back
-   from very close while the light comes up, the logo fills with a sunset
-   gradient from the bottom up, then the orange dot ignites.
+/* Xley logo reveal, vertical 9:16, backlit teaser style.
+   Black screen -> a light comes up behind the black logo and spreads out from
+   the centre, revealing its outline -> the logo fills itself bottom-up with a
+   sunset gradient (palms inside) -> the orange dot ignites. The beats below are
+   timed to the song's downbeats (126 bpm) after the brand clip.
    Deterministic: renderFrame(t) draws the frame at time t (seconds). */
 const W = 1080, H = 1920;
 const DURATION = 7.5;          // seconds
+const BEAT = 60 / 126;         // song tempo
+const T_LIGHT = 0.915;         // first downbeat: the light starts to rise
+const T_LIGHT_END = T_LIGHT + 4 * BEAT;      // one bar later the outline is fully lit
+const T_FILL = T_LIGHT_END;                  // next downbeat: fill
+const T_FILL_END = T_FILL + 2 * BEAT;
+const T_DOT = T_FILL + 4 * BEAT;             // the downbeat after: the dot ignites
 const LOGO_SRC = 'xley_logo.png';
 const LOGO_W = 860;            // on-screen width once settled
 const RES = 2;                 // layers are built at 2x for sharp close-ups
@@ -99,12 +106,12 @@ function build(img) {
 
   // the black body, with a faint inner edge sheen so it reads as a solid object
   const body = mk(lw, lh), bg = body.getContext('2d');
-  bg.drawImage(tint(sil, '#040207'), 0, 0);
+  bg.drawImage(tint(sil, '#000000'), 0, 0);
   const sheen = mk(lw, lh), sg = sheen.getContext('2d');
   sg.drawImage(coloured, 0, 0); sg.globalCompositeOperation = 'destination-out';
   sg.filter = `blur(${6 * RES}px)`; sg.drawImage(sil, 0, 0); sg.filter = 'none';
   sg.globalCompositeOperation = 'destination-in'; sg.drawImage(sil, 0, 0);
-  bg.globalAlpha = 0.35; bg.drawImage(sheen, 0, 0);
+  L.sheen = sheen;
   L.body = body;
 
   // the fill: violet -> magenta -> pink sunset gradient with soft light streaks
@@ -229,46 +236,57 @@ function frame(t, fi) {
   ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.filter = 'none';
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
 
-  // camera: starts very close, pulls back fast-then-slow, keeps drifting a touch
-  const e = easeOutQuint(prog(t, 0, 5.0));
-  const S0 = 3.2;
-  const s = (S0 + (1 - S0) * e) * (1 - 0.03 * easeInOut(prog(t, 5.0, DURATION)));
-  // start framed on the X, end centred
-  const fx = 0.33 + (0.5 - 0.33) * easeOutCubic(prog(t, 0, 5.0));
+  // camera: logo centred, only a very slow drift back the whole time
+  const s = 1.07 - 0.07 * easeInOut(prog(t, 0, DURATION));
+  const fx = 0.5;
   const dw = L.w * s, dh = L.h * s;
   const x = W / 2 - dw * fx, y = H / 2 - dh / 2;
 
-  // light comes up from nothing, with a slight flicker as it catches
-  const up = easeInOut(prog(t, 0.25, 2.6));
-  const flick = 1 - 0.18 * Math.exp(-Math.pow((t - 1.1) / 0.12, 2)) - 0.12 * Math.exp(-Math.pow((t - 1.5) / 0.08, 2));
+  // light comes up behind the logo, with a slight flicker as it catches
+  const up = easeInOut(prog(t, T_LIGHT, T_LIGHT_END));
+  const flick = 1 - 0.25 * Math.exp(-Math.pow((t - T_LIGHT - 0.35) / 0.07, 2)) - 0.15 * Math.exp(-Math.pow((t - T_LIGHT - 0.6) / 0.05, 2));
   const breathe = 1 + 0.05 * Math.sin(t * 2.1);
-  const fp = prog(t, 2.7, 3.9);                       // fill progress
-  const I = up * flick * breathe * (1 - 0.3 * easeInOut(fp));
+  const fp = prog(t, T_FILL, T_FILL_END);           // fill progress
+  const hit = 0.45 * Math.exp(-Math.pow((t - T_DOT - 0.05) / 0.18, 2));   // light swells when the dot ignites
+  const I = up * flick * breathe * (1 - 0.3 * easeInOut(fp)) * (1 + hit);
+  // the light spreads out from behind the centre of the logo
+  const spread = 120 + 1100 * easeOutCubic(prog(t, T_LIGHT, T_LIGHT_END + 0.3));
 
   // faint warm haze behind the logo
   const hz = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 900);
   hz.addColorStop(0, `rgba(120,40,110,${0.22 * up})`); hz.addColorStop(0.5, `rgba(70,20,60,${0.10 * up})`); hz.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hz; ctx.fillRect(0, 0, W, H);
 
-  ctx.globalCompositeOperation = 'lighter';
-
-  // light rays: the wide glow smeared outward from the centre (cheap radial blur)
-  for (let k = 1; k <= 7; k++) {
-    const z = 1 + k * 0.035;
-    ctx.globalAlpha = I * 0.10 * (1 - k / 8);
-    ctx.drawImage(L.rimWide, W / 2 - dw * z / 2 + (0.5 - fx) * dw, y - dh * (z - 1) / 2, dw * z, dh * z);
+  if (I > 0.001) {
+    const lg = off.getContext('2d');
+    lg.globalCompositeOperation = 'source-over'; lg.globalAlpha = 1; lg.clearRect(0, 0, W, H);
+    lg.globalCompositeOperation = 'lighter';
+    // light rays: the wide glow smeared outward from the centre (cheap radial blur)
+    for (let k = 1; k <= 7; k++) {
+      const z = 1 + k * 0.035;
+      lg.globalAlpha = clamp(I * 0.10 * (1 - k / 8));
+      lg.drawImage(L.rimWide, W / 2 - dw * z / 2, y - dh * (z - 1) / 2, dw * z, dh * z);
+    }
+    // rim light layers, wide to tight
+    lg.globalAlpha = clamp(I * 0.55); lg.drawImage(L.rimHuge, x, y, dw, dh);
+    lg.globalAlpha = clamp(I * 0.85); lg.drawImage(L.rimWide, x, y, dw, dh);
+    lg.globalAlpha = clamp(I); lg.drawImage(L.rimMid, x, y, dw, dh);
+    lg.globalAlpha = clamp(I); lg.drawImage(L.rimTight, x, y, dw, dh);
+    lg.globalAlpha = clamp(I) * 0.9; lg.drawImage(L.edge, x, y, dw, dh);
+    // only where the light has spread to
+    lg.globalCompositeOperation = 'destination-in'; lg.globalAlpha = 1;
+    const m = lg.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, spread);
+    m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.6, 'rgba(0,0,0,0.9)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+    lg.fillStyle = m; lg.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1; ctx.drawImage(off, 0, 0);
+    if (hit > 0.01) { ctx.globalAlpha = hit; ctx.drawImage(off, 0, 0); }
   }
-
-  // rim light layers, wide to tight
-  ctx.globalAlpha = I * 0.55; ctx.drawImage(L.rimHuge, x, y, dw, dh);
-  ctx.globalAlpha = I * 0.85; ctx.drawImage(L.rimWide, x, y, dw, dh);
-  ctx.globalAlpha = I * 1.00; ctx.drawImage(L.rimMid, x, y, dw, dh);
-  ctx.globalAlpha = I * 1.00; ctx.drawImage(L.rimTight, x, y, dw, dh);
-  ctx.globalAlpha = clamp(I) * 0.9; ctx.drawImage(L.edge, x, y, dw, dh);
 
   // black body on top
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1; ctx.drawImage(L.body, x, y, dw, dh);
+  ctx.globalAlpha = 0.35 * clamp(I); ctx.drawImage(L.sheen, x, y, dw, dh);   // inner edge sheen only once lit
+  ctx.globalAlpha = 1;
 
   // the logo fills itself from the bottom up, then the inner border lights
   if (fp > 0) {
@@ -294,14 +312,14 @@ function frame(t, fi) {
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.8 * flash; ctx.drawImage(off, 0, 0);
       ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = easeInOut(prog(t, 3.3, 4.1)); ctx.drawImage(L.stroke, x, y, dw, dh);
+    ctx.globalAlpha = easeInOut(prog(t, T_FILL + 0.5, T_FILL_END + 0.6)); ctx.drawImage(L.stroke, x, y, dw, dh);
     ctx.globalAlpha = 1;
   }
 
   // the orange dot ignites
-  const dp = prog(t, 4.1, 4.7);
+  const dp = prog(t, T_DOT - 0.04, T_DOT + 0.45);
   if (dp > 0) {
-    const pop = easeOutCubic(dp) * (1 + 0.35 * Math.exp(-Math.pow((t - 4.35) / 0.12, 2)));
+    const pop = easeOutCubic(dp) * (1 + 0.35 * Math.exp(-Math.pow((t - T_DOT - 0.1) / 0.12, 2)));
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.55 * pop; ctx.drawImage(L.dotGlow, x, y, dw, dh);
     ctx.globalCompositeOperation = 'source-over';
