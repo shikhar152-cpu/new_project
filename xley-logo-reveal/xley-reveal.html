@@ -16,7 +16,8 @@
    The logo is traced into vector pieces (X, L, E, Y, ring, dot) and built up
    with long, smooth eases and a continuous slow push-in:
    black -> thin glowing outlines slowly draw every letter -> colour blooms up
-   through the letters -> the orange dot fades in -> a slow light sweep -> hold.
+   through the letters -> the orange dot fades in -> a slow light sweep -> on
+   the last downbeat the logo turns to its real brand colours (white, orange dot).
    Key moments land on the song's downbeats (126 bpm) after the brand clip.
    Deterministic: renderFrame(t) draws the frame at time t (seconds). */
 const W = 1080, H = 1920;
@@ -28,6 +29,8 @@ const T_FILL = T0 + 8 * BEAT;          // colour blooms in on the next downbeat
 const FILL_DUR = 2.6;
 const T_DOT = T0 + 12 * BEAT;          // the dot fades in on the downbeat after
 const T_SHINE = T0 + 16 * BEAT;        // slow light sweep
+const T_WHITE = T0 + 20 * BEAT;        // last downbeat: the logo turns to its real brand colours
+const WHITE_DUR = 0.46;                // (white letters and ring, orange dot), then holds
 const LOGO_W = 860;                    // on-screen width at the end of the push-in
 
 const P = window.LOGO_PATHS;
@@ -90,13 +93,14 @@ function frame(t) {
   const sc = K * cam, ox = W / 2 - P.w * sc / 2, oy = H / 2 - P.h * sc / 2;
   const toLogo = () => ctx.setTransform(sc, 0, 0, sc, ox, oy);
   const px = v => v / sc;   // screen px -> logo px (for line widths)
+  const wt = sine(prog(t, T_WHITE, T_WHITE + WHITE_DUR));   // 0 = sunset colours, 1 = brand white
 
   // a faint ambient glow that grows as the colour comes in
   const lit = sine(prog(t, T_FILL, T_FILL + FILL_DUR + 1));
   if (lit > 0) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 640 * cam);
-    g.addColorStop(0, `rgba(150,60,200,${0.14 * lit})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    g.addColorStop(0, `rgba(150,60,200,${0.14 * lit * (1 - wt)})`); g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
 
@@ -132,13 +136,13 @@ function frame(t) {
     // 2. the outline drawing itself on: thin line, soft glow, a gentle light at its tip
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.setLineDash([p.len * drawP, p.len * 2]);
-    const glowA = 1 - 0.6 * sine(fillP);
+    const glowA = (1 - 0.6 * sine(fillP)) * (1 - wt);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.shadowColor = 'rgba(255,90,200,0.85)'; ctx.shadowBlur = 22 * glowA;
     ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(6); ctx.globalAlpha = 0.45 * glowA; ctx.stroke(p.path);
     ctx.restore();
-    ctx.globalAlpha = clamp(drawP * 4);
+    ctx.globalAlpha = clamp(drawP * 4) * (1 - wt);
     ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(3); ctx.stroke(p.path);
     ctx.globalAlpha = 1; ctx.setLineDash([]);
 
@@ -151,6 +155,9 @@ function frame(t) {
       ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = sp; ctx.fillRect(sx - R, sy - R, 2 * R, 2 * R);
       ctx.globalCompositeOperation = 'source-over';
     }
+
+    // at the end each piece turns to the real logo colour: solid white
+    if (wt > 0) { toLogo(); ctx.globalAlpha = wt; ctx.fillStyle = '#ffffff'; ctx.fill(p.path); ctx.globalAlpha = 1; }
   }
 
   // 3. the orange dot fades and grows in, with a warm bloom that settles
@@ -160,7 +167,7 @@ function frame(t) {
     const s = 0.6 + 0.4 * easeOutQuart(dp);
     const bloom = 0.15 + 0.35 * Math.sin(Math.PI * clamp(dp * 1.25)) * (dp < 0.8 ? 1 : 1);
     const bg = ctx.createRadialGradient(DOT.cx, DOT.cy, 0, DOT.cx, DOT.cy, DOT.r * 3.2);
-    bg.addColorStop(0, `rgba(255,150,70,${bloom * sine(dp * 2)})`); bg.addColorStop(1, 'rgba(255,120,50,0)');
+    bg.addColorStop(0, `rgba(255,150,70,${bloom * sine(dp * 2) * (1 - wt)})`); bg.addColorStop(1, 'rgba(255,120,50,0)');
     ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = bg; ctx.fillRect(DOT.cx - DOT.r * 4, DOT.cy - DOT.r * 4, DOT.r * 8, DOT.r * 8);
     ctx.globalCompositeOperation = 'source-over';
     ctx.save();
@@ -169,6 +176,7 @@ function frame(t) {
     const g = ctx.createRadialGradient(DOT.cx - DOT.r * 0.3, DOT.cy - DOT.r * 0.3, 0, DOT.cx, DOT.cy, DOT.r);
     g.addColorStop(0, '#ffb066'); g.addColorStop(1, '#e8853a');
     ctx.fillStyle = g; ctx.fill(DOT.path);
+    if (wt > 0) { ctx.globalAlpha = sine(dp * 1.4) * wt; ctx.fillStyle = '#e8853a'; ctx.fill(DOT.path); }   // flat brand orange
     ctx.restore();
   }
 
@@ -181,6 +189,15 @@ function frame(t) {
     g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, `rgba(255,250,255,${0.38 * Math.sin(Math.PI * sw)})`); g.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(-100, -100, P.w + 200, P.h + 200);
     ctx.restore();
+  }
+
+  // 5. a soft flash of light as the logo turns white
+  if (wt > 0 && wt < 1) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 560 * cam);
+    g.addColorStop(0, `rgba(255,255,255,${0.09 * Math.sin(Math.PI * wt)})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
   }
 }
 
