@@ -1,18 +1,20 @@
-// Renders zilly-reveal.html frame by frame and encodes it to MP4 with ffmpeg.
+// Renders xley-reveal.html frame by frame and encodes it to MP4 with ffmpeg.
 // Usage: node render.js [fps]
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
 const path = require('path');
 
-const FPS = Number(process.argv[2] || 30);
+const FPS = Number(process.argv[2] || 24);
 const dir = __dirname;
-const out = path.join(dir, 'zilly_logo_reveal.mp4');
+const out = path.join(dir, 'xley_logo_reveal.mp4');
 
 (async () => {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   await page.addInitScript(() => { window.__RENDERING__ = true; });
-  await page.goto('file://' + path.join(dir, 'zilly-reveal.html'));
+  // served over http so the logo image can be read back from the canvas
+  const server = require('http').createServer((q, r) => require('fs').createReadStream(path.join(dir, decodeURIComponent(q.url.split('?')[0]))).on('error', () => { r.statusCode = 404; r.end(); }).pipe(r)).listen(0);
+  await page.goto('http://127.0.0.1:' + server.address().port + '/xley-reveal.html');
   await page.evaluate(() => window.ready);
   const duration = await page.evaluate(() => window.DURATION);
   const total = Math.round(duration * FPS);
@@ -28,6 +30,6 @@ const out = path.join(dir, 'zilly_logo_reveal.mp4');
   }
   ff.stdin.end();
   await new Promise(r => ff.on('close', r));
-  await browser.close();
+  await browser.close(); server.close();
   console.log('wrote', out);
 })();
