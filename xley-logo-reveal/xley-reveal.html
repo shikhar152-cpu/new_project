@@ -7,352 +7,191 @@
   html, body { margin: 0; background: #000; overflow: hidden; height: 100%; }
   canvas { display: block; height: 100vh; margin: 0 auto; }
 </style>
+<script src="logo_paths.js"></script>
 </head>
 <body>
 <canvas id="c" width="1080" height="1920"></canvas>
 <script>
-/* Xley logo reveal, vertical 9:16, backlit teaser style.
-   Black screen -> a light comes up behind the black logo and spreads out from
-   the centre, revealing its outline -> the logo fills itself bottom-up with a
-   sunset gradient (palms inside) -> the orange dot ignites. The beats below are
-   timed to the song's downbeats (126 bpm) after the brand clip.
+/* Xley logo reveal, vertical 9:16 motion graphic.
+   The logo is traced into vector pieces (X, L, E, Y, ring, dot) and built up:
+   black -> glowing outlines draw each letter in turn -> letters fill with a
+   sunset gradient one after another with a small pop -> the dot pops in with a
+   shockwave -> a light sweep crosses the logo, which then holds.
+   Key moments land on the song's downbeats (126 bpm) after the brand clip.
    Deterministic: renderFrame(t) draws the frame at time t (seconds). */
 const W = 1080, H = 1920;
-const DURATION = 7.5;          // seconds
-const BEAT = 60 / 126;         // song tempo
-const T_LIGHT = 0.915;         // first downbeat: the light starts to rise
-const T_LIGHT_END = T_LIGHT + 4 * BEAT;      // one bar later the outline is fully lit
-const T_FILL = T_LIGHT_END;                  // next downbeat: fill
-const T_FILL_END = T_FILL + 2 * BEAT;
-const T_DOT = T_FILL + 4 * BEAT;             // the downbeat after: the dot ignites
-const LOGO_SRC = 'xley_logo.png';
-const LOGO_W = 860;            // on-screen width once settled
-const RES = 2;                 // layers are built at 2x for sharp close-ups
+const DURATION = 7.5;
+const BEAT = 60 / 126;
+const T_DRAW = 0.915;                 // downbeat 1: outlines start drawing
+const T_FILL = T_DRAW + 4 * BEAT;     // downbeat 2: letters fill
+const T_DOT = T_FILL + 4 * BEAT;      // downbeat 3: dot pops
+const T_SHINE = T_DOT + 1.5 * BEAT;   // light sweep
+const LOGO_W = 860;                   // on-screen width
 
-const cv = document.getElementById('c');
-const ctx = cv.getContext('2d');
+const P = window.LOGO_PATHS;
+const K = LOGO_W / P.w;               // logo px -> screen px
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 
 // ---------- helpers ----------
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
-const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
-const easeOutQuint = x => 1 - Math.pow(1 - x, 5);
-const easeInOut = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
 const prog = (t, a, b) => clamp((t - a) / (b - a));
-function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
-const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
-function tint(mask, fill) { // copy of mask filled with a colour/gradient, keeping mask alpha
-  const c = mk(mask.width, mask.height), g = c.getContext('2d');
-  g.drawImage(mask, 0, 0); g.globalCompositeOperation = 'source-in';
-  g.fillStyle = typeof fill === 'function' ? fill(g) : fill; g.fillRect(0, 0, c.width, c.height);
-  return c;
+const easeInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeOutElastic = x => x === 0 ? 0 : x === 1 ? 1 : Math.pow(2, -9 * x) * Math.sin((x * 10 - 0.75) * (2 * Math.PI) / 3) + 1;
+
+// ---------- pieces ----------
+function polyPath(pts) { const p = new Path2D(); pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; }
+function polyLen(pts) { let L = 0; for (let i = 0; i < pts.length; i++) { const [a, b] = pts[i], [c, d] = pts[(i + 1) % pts.length]; L += Math.hypot(c - a, d - b); } return L; }
+function pointAt(pts, f) { // point at fraction f along the closed outline
+  let target = f * polyLen(pts);
+  for (let i = 0; i < pts.length; i++) {
+    const [a, b] = pts[i], [c, d] = pts[(i + 1) % pts.length], l = Math.hypot(c - a, d - b);
+    if (target <= l) return [a + (c - a) * target / l, b + (d - b) * target / l];
+    target -= l;
+  }
+  return pts[0];
+}
+const piece = name => P.pieces.find(p => p.name === name);
+// draw order and stagger: X with its ring first, then L, E, Y
+const ORDER = [['X', 0], ['ring', 0.12], ['L', 0.30], ['E', 0.55], ['Y', 0.80]];
+const PIECES = ORDER.map(([name, delay]) => {
+  const p = piece(name), pts = p.paths[0];
+  // start each outline at its lowest-left point so the line travels up and round
+  let s = 0; pts.forEach(([x, y], i) => { if (y - x * 0.3 > pts[s][1] - pts[s][0] * 0.3) s = i; });
+  const rot = pts.slice(s).concat(pts.slice(0, s));
+  return { name, delay, pts: rot, path: polyPath(rot), len: polyLen(rot), cx: p.x + p.w / 2, cy: p.y + p.h / 2 };
+});
+const DOT = { pts: P.dot[0], path: polyPath(P.dot[0]) };
+DOT.cx = DOT.pts.reduce((s, p) => s + p[0], 0) / DOT.pts.length;
+DOT.cy = DOT.pts.reduce((s, p) => s + p[1], 0) / DOT.pts.length;
+DOT.r = Math.max(...DOT.pts.map(([x, y]) => Math.hypot(x - DOT.cx, y - DOT.cy)));
+const ALL = new Path2D(); PIECES.forEach(p => ALL.addPath(p.path));
+
+// colours (in logo space)
+function fillGrad(c) {
+  const g = c.createLinearGradient(P.w * 0.1, -P.h * 0.05, P.w * 0.22, P.h * 1.05);
+  g.addColorStop(0.00, '#6c4cff'); g.addColorStop(0.38, '#a43fe6'); g.addColorStop(0.70, '#e260c8'); g.addColorStop(1.00, '#ff9fae');
+  return g;
+}
+function lineGrad(c) {
+  const g = c.createLinearGradient(0, 0, P.w, P.h);
+  g.addColorStop(0.0, '#ffd27a'); g.addColorStop(0.4, '#ff9a6a'); g.addColorStop(0.75, '#ff5fd0'); g.addColorStop(1.0, '#b46cff');
+  return g;
 }
 
-// ---------- prebuilt layers ----------
-let L = {}, grain = [];
-const off = mk(W, H);   // scratch layer for the fill wipe
-
-function build(img) {
-  const lw0 = LOGO_W * RES, lh0 = Math.round(img.height * lw0 / img.width);
-  const pad = 420 * RES;
-  const lw = lw0 + pad * 2, lh = lh0 + pad * 2;
-  L.w = lw / RES; L.h = lh / RES; L.pad = pad / RES; L.lh0 = lh0 / RES;
-
-  // full silhouette (letters + ring + dot)
-  const sil = mk(lw, lh); sil.getContext('2d').drawImage(img, pad, pad, lw0, lh0);
-
-  // orange-dot-only mask: pixels where the logo is orange rather than white
-  const dot = mk(lw, lh); const dg = dot.getContext('2d'); dg.drawImage(sil, 0, 0);
-  const d = dg.getImageData(0, 0, lw, lh);
-  for (let i = 0; i < d.data.length; i += 4) {
-    const orange = clamp((235 - d.data[i + 2]) / (235 - 70));
-    d.data[i + 3] = d.data[i + 3] * orange;
-  }
-  dg.putImageData(d, 0, 0);
-
-  // light colour across the logo: magenta/violet top-left -> peach/orange bottom-right
-  const light = g => {
-    const gr = g.createLinearGradient(pad, pad - lh0 * 0.3, pad + lw0, pad + lh0 * 1.3);
-    gr.addColorStop(0.00, '#d24bff');
-    gr.addColorStop(0.30, '#ff4fb8');
-    gr.addColorStop(0.62, '#ff8a6a');
-    gr.addColorStop(1.00, '#ffc27a');
-    return gr;
-  };
-  const coloured = tint(sil, light);
-
-  // rim glow = blurred silhouette minus the silhouette itself (light only spills outward)
-  const glow = (r, a) => {
-    const c = mk(lw, lh), g = c.getContext('2d');
-    // big blurs are done on a downscaled copy: Chrome clips very large canvas blurs
-    const f = r * RES >= 30 ? 8 : 1;
-    const sm = mk(Math.ceil(lw / f), Math.ceil(lh / f)), sg = sm.getContext('2d');
-    sg.filter = `blur(${r * RES / f}px)`; sg.drawImage(coloured, 0, 0, sm.width, sm.height);
-    g.imageSmoothingQuality = 'high'; g.globalAlpha = a; g.drawImage(sm, 0, 0, lw, lh);
-    g.globalAlpha = 1; g.globalCompositeOperation = 'destination-out'; g.drawImage(sil, 0, 0);
-    return c;
-  };
-  L.rimTight = glow(2.5, 1);
-  L.rimMid = glow(12, 1);
-  L.rimWide = glow(42, 0.9);
-  L.rimHuge = glow(105, 0.85);
-
-  // hot white-ish core on the very edge
-  const edge = mk(lw, lh), eg = edge.getContext('2d');
-  const hot = tint(sil, 'rgba(255,235,240,1)');
-  eg.filter = `blur(${1.2 * RES}px)`; eg.drawImage(hot, 0, 0); eg.filter = 'none';
-  eg.globalCompositeOperation = 'destination-out'; eg.drawImage(sil, 0, 0);
-  L.edge = edge;
-
-  // the black body, with a faint inner edge sheen so it reads as a solid object
-  const body = mk(lw, lh), bg = body.getContext('2d');
-  bg.drawImage(tint(sil, '#000000'), 0, 0);
-  const sheen = mk(lw, lh), sg = sheen.getContext('2d');
-  sg.drawImage(coloured, 0, 0); sg.globalCompositeOperation = 'destination-out';
-  sg.filter = `blur(${6 * RES}px)`; sg.drawImage(sil, 0, 0); sg.filter = 'none';
-  sg.globalCompositeOperation = 'destination-in'; sg.drawImage(sil, 0, 0);
-  L.sheen = sheen;
-  L.body = body;
-
-  // the fill: blue-violet -> magenta -> pink sunset gradient, with soft palm silhouettes
-  const fill = mk(lw, lh), fg = fill.getContext('2d');
-  fg.drawImage(tint(sil, g => {
-    const gr = g.createLinearGradient(pad + lw0 * 0.1, pad - lh0 * 0.05, pad + lw0 * 0.25, pad + lh0 * 1.05);
-    gr.addColorStop(0.00, '#6c4cff'); gr.addColorStop(0.38, '#a43fe6');
-    gr.addColorStop(0.70, '#e260c8'); gr.addColorStop(1.00, '#ff9fae');
-    return gr;
-  }), 0, 0);
-  fg.globalCompositeOperation = 'source-atop';
-  const hz = fg.createLinearGradient(0, pad + lh0 * 0.6, 0, pad + lh0);   // warm light low down
-  hz.addColorStop(0, 'rgba(255,170,150,0)'); hz.addColorStop(1, 'rgba(255,180,150,0.28)');
-  fg.fillStyle = hz; fg.fillRect(0, 0, lw, lh);
-  const palms = mk(lw, lh), pg = palms.getContext('2d');
-  drawPalms(pg, pad, lw0, lh0);
-  const soft = mk(lw, lh), so = soft.getContext('2d');
-  so.filter = `blur(${2.5 * RES}px)`; so.drawImage(palms, 0, 0);
-  fg.drawImage(soft, 0, 0);
-  fg.globalCompositeOperation = 'destination-out'; fg.drawImage(dot, 0, 0);   // the dot keeps its own colour
-  L.fill = fill;
-
-  // two-tone border: a thin gold-to-magenta outer line, then a deeper purple band inside
-  const erode = r => {
-    const c = mk(lw, lh), g = c.getContext('2d');
-    g.drawImage(sil, 0, 0); g.globalCompositeOperation = 'destination-in';
-    for (let k = 0; k < 24; k++) g.drawImage(sil, Math.cos(k / 24 * 6.283) * r, Math.sin(k / 24 * 6.283) * r);
-    return c;
-  };
-  const e1 = erode(3 * RES), e2 = erode(9 * RES);
-  const ring = (fillStyle, outer, inner) => {
-    const c = tint(outer, fillStyle), g = c.getContext('2d');
-    g.globalCompositeOperation = 'destination-out'; g.drawImage(inner, 0, 0); g.drawImage(dot, 0, 0);
-    return c;
-  };
-  const stroke = mk(lw, lh), stg = stroke.getContext('2d');
-  stg.drawImage(ring(g => {
-    const gr = g.createLinearGradient(pad, pad, pad + lw0, pad + lh0);
-    gr.addColorStop(0.0, '#ffc15a'); gr.addColorStop(0.45, '#ff8a6a'); gr.addColorStop(0.75, '#e05ad8'); gr.addColorStop(1.0, '#b45cff');
-    return gr;
-  }, sil, e1), 0, 0);
-  stg.drawImage(ring(g => {
-    const gr = g.createLinearGradient(0, pad, 0, pad + lh0);
-    gr.addColorStop(0, '#5a28c8'); gr.addColorStop(1, '#a02fc0');
-    return gr;
-  }, e1, e2), 0, 0);
-  L.stroke = stroke;
-
-  // the orange dot, lit
-  L.dot = tint(dot, g => { const r = g.createRadialGradient(pad + lw0 * 0.07, pad + lh0 * 0.8, 0, pad + lw0 * 0.07, pad + lh0 * 0.8, lw0 * 0.05); r.addColorStop(0, '#ffb46e'); r.addColorStop(1, '#e8853a'); return r; });
-  const dGlow = mk(lw, lh), dgg = dGlow.getContext('2d');
-  for (const [r, col] of [[30, '#ff8a3a'], [90, '#ff6a2a']]) {
-    const sm = mk(Math.ceil(lw / 8), Math.ceil(lh / 8)), sg = sm.getContext('2d');
-    sg.filter = `blur(${r * RES / 8}px)`; sg.drawImage(tint(dot, col), 0, 0, sm.width, sm.height);
-    dgg.drawImage(sm, 0, 0, lw, lh);
-  }
-  L.dotGlow = dGlow;
-}
-
-// Coconut palms, drawn procedurally: a curved trunk and a crown of feathery fronds.
-function drawPalm(g, bx, by, h, lean, scale, seed) {
-  const rnd = mulberry32(seed);
-  const tx = bx + lean * h, ty = by - h;                     // crown position
-  const cx = bx + lean * h * 0.15, cy = by - h * 0.55;       // trunk bend
-  // trunk: tapered band along a quadratic curve
-  const N = 30, w0 = 16 * scale, w1 = 7 * scale, L = [], Rr = [];
-  for (let i = 0; i <= N; i++) {
-    const u = i / N, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
-    const px = a * bx + b * cx + c * tx, py = a * by + b * cy + c * ty;
-    const dx = 2 * (1 - u) * (cx - bx) + 2 * u * (tx - cx), dy = 2 * (1 - u) * (cy - by) + 2 * u * (ty - cy);
-    const len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len, w = (w0 + (w1 - w0) * u) / 2;
-    L.push([px + nx * w, py + ny * w]); Rr.push([px - nx * w, py - ny * w]);
-  }
-  g.beginPath(); g.moveTo(...L[0]); L.forEach(p => g.lineTo(...p)); Rr.reverse().forEach(p => g.lineTo(...p)); g.closePath(); g.fill();
-  // fronds
-  const n = 9;
-  for (let k = 0; k < n; k++) {
-    const ang = -Math.PI / 2 + (k / (n - 1) - 0.5) * Math.PI * 1.55 + (rnd() - 0.5) * 0.25;
-    const len = (110 + rnd() * 60) * scale;
-    const ex = tx + Math.cos(ang) * len, ey = ty + Math.sin(ang) * len * 0.55 + len * 0.45; // tips droop
-    const qx = tx + Math.cos(ang) * len * 0.55, qy = ty + Math.sin(ang) * len * 0.75 - 18 * scale;
-    // rib
-    g.lineWidth = 4 * scale; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(tx, ty); g.quadraticCurveTo(qx, qy, ex, ey); g.stroke();
-    // leaflets hanging off both sides of the rib
-    for (let i = 2; i <= 22; i++) {
-      const u = i / 23, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
-      const px = a * tx + b * qx + c * ex, py = a * ty + b * qy + c * ey;
-      const dx = 2 * (1 - u) * (qx - tx) + 2 * u * (ex - qx), dy = 2 * (1 - u) * (qy - ty) + 2 * u * (ey - qy);
-      const ra = Math.atan2(dy, dx), ll = (40 - 28 * u) * scale * (0.85 + rnd() * 0.3);
-      g.lineWidth = (8 - 5 * u) * scale;
-      for (const side of [-1, 1]) {
-        const la = ra + side * 0.9 + 0.35;          // leaflets angle back and hang down
-        g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(la) * ll, py + Math.sin(la) * ll + ll * 0.35); g.stroke();
-      }
-    }
-  }
-  // coconuts
-  for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(tx + (i - 1) * 9 * scale, ty + 10 * scale, 6 * scale, 0, 7); g.fill(); }
-}
-
-function drawPalms(g, pad, lw0, lh0) {
-  const S = lw0 / 860 * 1.15;           // size relative to the logo
-  const base = pad + lh0 * 1.15;
-  // x (fraction of logo width), height (fraction of logo height), lean, size, seed, colour
-  const back = 'rgba(85,35,170,0.30)', front = 'rgba(70,22,150,0.48)';
-  const trees = [
-    [0.30, 0.70, 0.18, 0.75, 23, back], [0.62, 0.66, -0.20, 0.75, 41, back], [0.97, 0.62, -0.15, 0.7, 67, back],
-    [0.10, 0.88, 0.22, 1.00, 11, front], [0.46, 0.96, -0.16, 1.10, 37, front], [0.82, 0.90, 0.20, 1.05, 59, front]];
-  trees.forEach(([fx, fh, lean, sz, seed, col]) => {
-    g.fillStyle = g.strokeStyle = col;
-    drawPalm(g, pad + lw0 * fx, base, lh0 * fh, lean, S * sz, seed);
-  });
-}
-
-function buildGrain() {
-  const rnd = mulberry32(1337);
-  for (let k = 0; k < 8; k++) {
-    const c = mk(360, 640), g = c.getContext('2d'), img = g.createImageData(360, 640);
-    for (let i = 0; i < img.data.length; i += 4) { const v = rnd() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
-    g.putImageData(img, 0, 0); grain.push(c);
-  }
-}
-
-// ---------- scene ----------
-function frame(t, fi) {
-  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.filter = 'none';
+// ---------- frame ----------
+function frame(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
 
-  // camera: logo centred, only a very slow drift back the whole time
-  const s = 1.07 - 0.07 * easeInOut(prog(t, 0, DURATION));
-  const fx = 0.5;
-  const dw = L.w * s, dh = L.h * s;
-  const x = W / 2 - dw * fx, y = H / 2 - dh / 2;
+  // camera: a very slow push in the whole time
+  const cam = 0.985 + 0.045 * easeInOut(prog(t, 0, DURATION));
+  const sc = K * cam, ox = W / 2 - P.w * sc / 2, oy = H / 2 - P.h * sc / 2;
+  const toLogo = () => ctx.setTransform(sc, 0, 0, sc, ox, oy);
+  const px = v => v / sc;   // screen px -> logo px (for line widths)
 
-  // light comes up behind the logo, with a slight flicker as it catches
-  const up = easeInOut(prog(t, T_LIGHT, T_LIGHT_END));
-  const flick = 1 - 0.25 * Math.exp(-Math.pow((t - T_LIGHT - 0.35) / 0.07, 2)) - 0.15 * Math.exp(-Math.pow((t - T_LIGHT - 0.6) / 0.05, 2));
-  const breathe = 1 + 0.05 * Math.sin(t * 2.1);
-  const fp = prog(t, T_FILL, T_FILL_END);           // fill progress
-  const hit = 0.45 * Math.exp(-Math.pow((t - T_DOT - 0.05) / 0.18, 2));   // light swells when the dot ignites
-  const I = up * flick * breathe * (1 - 0.55 * easeInOut(fp)) * (1 + hit);
-  // the light spreads out from behind the centre of the logo
-  const spread = 120 + 1100 * easeOutCubic(prog(t, T_LIGHT, T_LIGHT_END + 0.3));
-
-  // faint warm haze behind the logo
-  const hz = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 900);
-  hz.addColorStop(0, `rgba(120,40,110,${0.22 * up})`); hz.addColorStop(0.5, `rgba(70,20,60,${0.10 * up})`); hz.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = hz; ctx.fillRect(0, 0, W, H);
-
-  if (I > 0.001) {
-    const lg = off.getContext('2d');
-    lg.globalCompositeOperation = 'source-over'; lg.globalAlpha = 1; lg.clearRect(0, 0, W, H);
-    lg.globalCompositeOperation = 'lighter';
-    // light rays: the wide glow smeared outward from the centre (cheap radial blur)
-    for (let k = 1; k <= 7; k++) {
-      const z = 1 + k * 0.035;
-      lg.globalAlpha = clamp(I * 0.10 * (1 - k / 8));
-      lg.drawImage(L.rimWide, W / 2 - dw * z / 2, y - dh * (z - 1) / 2, dw * z, dh * z);
-    }
-    // rim light layers, wide to tight
-    lg.globalAlpha = clamp(I * 0.55); lg.drawImage(L.rimHuge, x, y, dw, dh);
-    lg.globalAlpha = clamp(I * 0.85); lg.drawImage(L.rimWide, x, y, dw, dh);
-    lg.globalAlpha = clamp(I); lg.drawImage(L.rimMid, x, y, dw, dh);
-    lg.globalAlpha = clamp(I); lg.drawImage(L.rimTight, x, y, dw, dh);
-    lg.globalAlpha = clamp(I) * 0.9; lg.drawImage(L.edge, x, y, dw, dh);
-    // only where the light has spread to
-    lg.globalCompositeOperation = 'destination-in'; lg.globalAlpha = 1;
-    const m = lg.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, spread);
-    m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.6, 'rgba(0,0,0,0.9)'); m.addColorStop(1, 'rgba(0,0,0,0)');
-    lg.fillStyle = m; lg.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1; ctx.drawImage(off, 0, 0);
-    if (hit > 0.01) { ctx.globalAlpha = hit; ctx.drawImage(off, 0, 0); }
+  // soft glow once the logo is filled
+  const lit = easeOut(prog(t, T_FILL, T_FILL + 1.2));
+  if (lit > 0) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 620);
+    g.addColorStop(0, `rgba(150,60,200,${0.16 * lit})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
 
-  // black body on top
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 1; ctx.drawImage(L.body, x, y, dw, dh);
-  ctx.globalAlpha = 0.35 * clamp(I); ctx.drawImage(L.sheen, x, y, dw, dh);   // inner edge sheen only once lit
-  ctx.globalAlpha = 1;
+  for (const p of PIECES) {
+    const t0 = T_DRAW + p.delay, drawP = easeInOut(prog(t, t0, t0 + 1.25));
+    const f0 = T_FILL + p.delay * 0.35, fillP = prog(t, f0, f0 + 0.42);
+    if (drawP <= 0) continue;
 
-  // the logo fills itself from the bottom up, then the inner border lights
-  if (fp > 0) {
-    const top = y + L.pad * s, bot = y + (L.pad + L.lh0) * s, soft = 120;
-    const yw = bot + soft - (bot - top + soft * 2) * easeInOut(fp);
-    const og = off.getContext('2d');
-    og.globalCompositeOperation = 'source-over'; og.globalAlpha = 1; og.clearRect(0, 0, W, H);
-    og.drawImage(L.fill, x, y, dw, dh);
-    og.globalCompositeOperation = 'destination-in';
-    const wg = og.createLinearGradient(0, yw - soft, 0, yw + soft);
-    wg.addColorStop(0, 'rgba(0,0,0,0)'); wg.addColorStop(1, 'rgba(0,0,0,1)');
-    og.fillStyle = wg; og.fillRect(0, 0, W, H);
-    ctx.drawImage(off, 0, 0);
-    // bright leading edge of the fill
-    const flash = Math.sin(Math.PI * clamp(fp));
-    if (flash > 0.01) {
-      og.globalCompositeOperation = 'source-over'; og.clearRect(0, 0, W, H);
-      og.drawImage(L.fill, x, y, dw, dh);
-      og.globalCompositeOperation = 'destination-in';
-      const lg = og.createLinearGradient(0, yw - 40, 0, yw + 40);
-      lg.addColorStop(0, 'rgba(0,0,0,0)'); lg.addColorStop(0.5, 'rgba(0,0,0,1)'); lg.addColorStop(1, 'rgba(0,0,0,0)');
-      og.fillStyle = lg; og.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.8 * flash; ctx.drawImage(off, 0, 0);
-      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    // pop: each piece kicks a little bigger as it fills, then settles
+    const pop = fillP > 0 ? 1 + 0.07 * Math.sin(Math.PI * clamp(fillP * 1.4)) * (1 - fillP * 0.3) : 1;
+    toLogo();
+    ctx.translate(p.cx, p.cy); ctx.scale(pop, pop); ctx.translate(-p.cx, -p.cy);
+
+    // 1. the fill, wiping up from the bottom of each piece
+    if (fillP > 0) {
+      const e = easeOut(fillP);
+      ctx.save(); ctx.clip(p.path);
+      ctx.fillStyle = fillGrad(ctx); ctx.fill(p.path);
+      // still-unfilled top part stays dark, with a bright leading edge
+      const yTop = (P.h + 40) - (P.h + 80) * e;
+      ctx.fillStyle = '#000'; ctx.fillRect(-50, -50, P.w + 100, yTop + 50);
+      if (fillP < 1) {
+        const lg = ctx.createLinearGradient(0, yTop - 30, 0, yTop + 50);
+        lg.addColorStop(0, 'rgba(255,240,255,0)'); lg.addColorStop(0.45, `rgba(255,235,250,${0.9 * (1 - fillP)})`); lg.addColorStop(1, 'rgba(255,240,255,0)');
+        ctx.fillStyle = lg; ctx.fillRect(-50, yTop - 30, P.w + 100, 80);
+      }
+      // inner purple band along the edge (the stroke is clipped, so only its inner half shows)
+      ctx.globalAlpha = easeOut(prog(t, f0 + 0.2, f0 + 0.7));
+      ctx.lineJoin = 'round'; ctx.lineWidth = px(11); ctx.strokeStyle = 'rgba(80,30,190,0.85)'; ctx.stroke(p.path);
+      ctx.globalAlpha = 1;
+      ctx.restore();
     }
-    ctx.globalAlpha = easeInOut(prog(t, T_FILL + 0.5, T_FILL_END + 0.6)); ctx.drawImage(L.stroke, x, y, dw, dh);
-    ctx.globalAlpha = 1;
-  }
 
-  // the orange dot ignites
-  const dp = prog(t, T_DOT - 0.04, T_DOT + 0.45);
-  if (dp > 0) {
-    const pop = easeOutCubic(dp) * (1 + 0.35 * Math.exp(-Math.pow((t - T_DOT - 0.1) / 0.12, 2)));
+    // 2. the outline drawing itself on, with a glow and a spark at its tip
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.setLineDash([p.len * drawP, p.len * 2]);
+    const glowA = fillP > 0 ? 1 - 0.65 * easeOut(fillP) : 1;
+    ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.55 * pop; ctx.drawImage(L.dotGlow, x, y, dw, dh);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = clamp(pop); ctx.drawImage(L.dot, x, y, dw, dh);
+    ctx.shadowColor = 'rgba(255,90,200,0.9)'; ctx.shadowBlur = 26 * glowA;
+    ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(7); ctx.globalAlpha = 0.55 * glowA; ctx.stroke(p.path);
+    ctx.restore();
+    ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(3.2); ctx.stroke(p.path);
+    ctx.setLineDash([]);
+
+    if (drawP < 1) {
+      const [hx, hy] = pointAt(p.pts, drawP);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const sx = ox + hx * sc, sy = oy + hy * sc;
+      const sp = ctx.createRadialGradient(sx, sy, 0, sx, sy, 34);
+      sp.addColorStop(0, 'rgba(255,255,255,1)'); sp.addColorStop(0.25, 'rgba(255,200,240,0.8)'); sp.addColorStop(1, 'rgba(255,80,200,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = sp; ctx.fillRect(sx - 34, sy - 34, 68, 68);
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
 
-  // vignette, grain, fade in from black
-  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-  const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.75);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.7)');
-  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
-  ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = 0.025;
-  ctx.drawImage(grain[fi % grain.length], 0, 0, W, H);
-  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  // 3. the orange dot pops in with a shockwave
+  const dp = prog(t, T_DOT, T_DOT + 0.7);
+  if (dp > 0) {
+    toLogo();
+    const s = easeOutElastic(dp);
+    ctx.save();
+    ctx.translate(DOT.cx, DOT.cy); ctx.scale(s, s); ctx.translate(-DOT.cx, -DOT.cy);
+    const g = ctx.createRadialGradient(DOT.cx - DOT.r * 0.3, DOT.cy - DOT.r * 0.3, 0, DOT.cx, DOT.cy, DOT.r);
+    g.addColorStop(0, '#ffb066'); g.addColorStop(1, '#e8853a');
+    ctx.fillStyle = g; ctx.fill(DOT.path);   // crisp brand-orange dot
+    ctx.restore();
+    // shockwave rings
+    for (const [delay, maxR, w] of [[0, 7, 6], [0.08, 11, 3]]) {
+      const q = prog(t, T_DOT + delay, T_DOT + delay + 0.65);
+      if (q <= 0 || q >= 1) continue;
+      ctx.beginPath(); ctx.arc(DOT.cx, DOT.cy, DOT.r * (1 + maxR * easeOut(q)), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,170,90,${0.8 * (1 - q)})`; ctx.lineWidth = px(w * (1 - q) + 0.5); ctx.stroke();
+    }
+  }
+
+  // 4. light sweep across the finished logo
+  const sw = prog(t, T_SHINE, T_SHINE + 0.9);
+  if (sw > 0 && sw < 1) {
+    toLogo(); ctx.save(); ctx.clip(ALL);
+    const x = -P.w * 0.3 + P.w * 1.6 * easeInOut(sw);
+    const g = ctx.createLinearGradient(x - 160, 0, x + 160, P.h * 0.35);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,250,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(-100, -100, P.w + 200, P.h + 200);
+    ctx.restore();
+  }
 }
 
-window.renderFrame = (t, fi = Math.round(t * 24)) => frame(t, fi);
-
-window.ready = loadImg(LOGO_SRC).then(img => {
-  build(img); buildGrain();
-  window.DURATION = DURATION;
-  if (!window.__RENDERING__) {   // live preview when opened in a browser
-    const start = performance.now();
-    const loop = now => { const t = ((now - start) / 1000) % (DURATION + 1); renderFrame(Math.min(t, DURATION)); requestAnimationFrame(loop); };
-    requestAnimationFrame(loop);
-  }
-  return true;
-});
+window.renderFrame = t => frame(t);
+window.DURATION = DURATION;
+window.ready = Promise.resolve(true);
+if (!window.__RENDERING__) {   // live preview when opened in a browser
+  const start = performance.now();
+  const loop = now => { const t = ((now - start) / 1000) % (DURATION + 1); frame(Math.min(t, DURATION)); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+}
 </script>
 </body>
 </html>
