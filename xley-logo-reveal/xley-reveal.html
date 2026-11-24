@@ -114,40 +114,50 @@ function build(img) {
   L.sheen = sheen;
   L.body = body;
 
-  // the fill: violet -> magenta -> pink sunset gradient with soft light streaks
+  // the fill: blue-violet -> magenta -> pink sunset gradient, with soft palm silhouettes
   const fill = mk(lw, lh), fg = fill.getContext('2d');
   fg.drawImage(tint(sil, g => {
-    const gr = g.createLinearGradient(0, pad, 0, pad + lh0);
-    gr.addColorStop(0.00, '#6a3cf0'); gr.addColorStop(0.40, '#b23be0');
-    gr.addColorStop(0.75, '#ef5fc0'); gr.addColorStop(1.00, '#ff9bb8');
+    const gr = g.createLinearGradient(pad + lw0 * 0.1, pad - lh0 * 0.05, pad + lw0 * 0.25, pad + lh0 * 1.05);
+    gr.addColorStop(0.00, '#6c4cff'); gr.addColorStop(0.38, '#a43fe6');
+    gr.addColorStop(0.70, '#e260c8'); gr.addColorStop(1.00, '#ff9fae');
     return gr;
   }), 0, 0);
   fg.globalCompositeOperation = 'source-atop';
-  for (const [cx, w, a] of [[0.18, 0.10, 0.16], [0.47, 0.06, 0.12], [0.74, 0.14, 0.14]]) {   // diagonal light streaks
-    const x0 = pad + lw0 * cx, sw = lw0 * w;
-    const gr = fg.createLinearGradient(x0 - sw, pad, x0 + sw, pad + lh0 * 0.6);
-    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, `rgba(255,230,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)');
-    fg.fillStyle = gr; fg.fillRect(0, 0, lw, lh);
-  }
-  const hz = fg.createLinearGradient(0, pad + lh0 * 0.55, 0, pad + lh0);   // warm glow low down
-  hz.addColorStop(0, 'rgba(255,160,120,0)'); hz.addColorStop(1, 'rgba(255,170,120,0.35)');
+  const hz = fg.createLinearGradient(0, pad + lh0 * 0.6, 0, pad + lh0);   // warm light low down
+  hz.addColorStop(0, 'rgba(255,170,150,0)'); hz.addColorStop(1, 'rgba(255,180,150,0.28)');
   fg.fillStyle = hz; fg.fillRect(0, 0, lw, lh);
-  drawPalms(fg, pad, lw0, lh0);   // coconut palm silhouettes inside the fill
+  const palms = mk(lw, lh), pg = palms.getContext('2d');
+  drawPalms(pg, pad, lw0, lh0);
+  const soft = mk(lw, lh), so = soft.getContext('2d');
+  so.filter = `blur(${2.5 * RES}px)`; so.drawImage(palms, 0, 0);
+  fg.drawImage(soft, 0, 0);
   fg.globalCompositeOperation = 'destination-out'; fg.drawImage(dot, 0, 0);   // the dot keeps its own colour
   L.fill = fill;
 
-  // thin inner border: silhouette minus an eroded silhouette
-  const er = mk(lw, lh), erg = er.getContext('2d');
-  erg.drawImage(sil, 0, 0); erg.globalCompositeOperation = 'destination-in';
-  const R = 5 * RES;
-  for (let k = 0; k < 16; k++) erg.drawImage(sil, Math.cos(k / 16 * 6.283) * R, Math.sin(k / 16 * 6.283) * R);
+  // two-tone border: a thin gold-to-magenta outer line, then a deeper purple band inside
+  const erode = r => {
+    const c = mk(lw, lh), g = c.getContext('2d');
+    g.drawImage(sil, 0, 0); g.globalCompositeOperation = 'destination-in';
+    for (let k = 0; k < 24; k++) g.drawImage(sil, Math.cos(k / 24 * 6.283) * r, Math.sin(k / 24 * 6.283) * r);
+    return c;
+  };
+  const e1 = erode(3 * RES), e2 = erode(9 * RES);
+  const ring = (fillStyle, outer, inner) => {
+    const c = tint(outer, fillStyle), g = c.getContext('2d');
+    g.globalCompositeOperation = 'destination-out'; g.drawImage(inner, 0, 0); g.drawImage(dot, 0, 0);
+    return c;
+  };
   const stroke = mk(lw, lh), stg = stroke.getContext('2d');
-  stg.drawImage(tint(sil, g => {
-    const gr = g.createLinearGradient(pad, pad + lh0, pad + lw0, pad);
-    gr.addColorStop(0.0, '#ffb35a'); gr.addColorStop(0.35, '#ff7ac8'); gr.addColorStop(1.0, '#9a5cff');
+  stg.drawImage(ring(g => {
+    const gr = g.createLinearGradient(pad, pad, pad + lw0, pad + lh0);
+    gr.addColorStop(0.0, '#ffc15a'); gr.addColorStop(0.45, '#ff8a6a'); gr.addColorStop(0.75, '#e05ad8'); gr.addColorStop(1.0, '#b45cff');
     return gr;
-  }), 0, 0);
-  stg.globalCompositeOperation = 'destination-out'; stg.drawImage(er, 0, 0); stg.drawImage(dot, 0, 0);
+  }, sil, e1), 0, 0);
+  stg.drawImage(ring(g => {
+    const gr = g.createLinearGradient(0, pad, 0, pad + lh0);
+    gr.addColorStop(0, '#5a28c8'); gr.addColorStop(1, '#a02fc0');
+    return gr;
+  }, e1, e2), 0, 0);
   L.stroke = stroke;
 
   // the orange dot, lit
@@ -191,8 +201,8 @@ function drawPalm(g, bx, by, h, lean, scale, seed) {
       const u = i / 23, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u;
       const px = a * tx + b * qx + c * ex, py = a * ty + b * qy + c * ey;
       const dx = 2 * (1 - u) * (qx - tx) + 2 * u * (ex - qx), dy = 2 * (1 - u) * (qy - ty) + 2 * u * (ey - qy);
-      const ra = Math.atan2(dy, dx), ll = (34 - 26 * u) * scale * (0.8 + rnd() * 0.4);
-      g.lineWidth = (5 - 3 * u) * scale;
+      const ra = Math.atan2(dy, dx), ll = (40 - 28 * u) * scale * (0.85 + rnd() * 0.3);
+      g.lineWidth = (8 - 5 * u) * scale;
       for (const side of [-1, 1]) {
         const la = ra + side * 0.9 + 0.35;          // leaflets angle back and hang down
         g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(la) * ll, py + Math.sin(la) * ll + ll * 0.35); g.stroke();
@@ -204,22 +214,17 @@ function drawPalm(g, bx, by, h, lean, scale, seed) {
 }
 
 function drawPalms(g, pad, lw0, lh0) {
-  const S = lw0 / 860 * 0.62;           // size relative to the logo
-  g.save();
-  g.globalCompositeOperation = 'source-atop';
-  const base = pad + lh0 * 1.08;
-  const trees = [ // x (fraction of logo width), height (fraction of logo height), lean, size, seed
-    [0.06, 0.62, 0.30, 0.95, 11], [0.27, 0.78, -0.20, 1.05, 23], [0.45, 0.55, 0.22, 0.80, 37],
-    [0.63, 0.80, -0.26, 1.10, 41], [0.84, 0.66, 0.22, 0.95, 59], [0.97, 0.50, -0.18, 0.75, 67]];
-  // back layer: faint, then front layer a little stronger
-  for (const [layer, col] of [[0, 'rgba(70,20,140,0.28)'], [1, 'rgba(55,12,115,0.45)']]) {
+  const S = lw0 / 860 * 1.15;           // size relative to the logo
+  const base = pad + lh0 * 1.15;
+  // x (fraction of logo width), height (fraction of logo height), lean, size, seed, colour
+  const back = 'rgba(85,35,170,0.30)', front = 'rgba(70,22,150,0.48)';
+  const trees = [
+    [0.30, 0.70, 0.18, 0.75, 23, back], [0.62, 0.66, -0.20, 0.75, 41, back], [0.97, 0.62, -0.15, 0.7, 67, back],
+    [0.10, 0.88, 0.22, 1.00, 11, front], [0.46, 0.96, -0.16, 1.10, 37, front], [0.82, 0.90, 0.20, 1.05, 59, front]];
+  trees.forEach(([fx, fh, lean, sz, seed, col]) => {
     g.fillStyle = g.strokeStyle = col;
-    trees.forEach(([fx, fh, lean, sz, seed], i) => {
-      if (i % 2 !== layer) return;
-      drawPalm(g, pad + lw0 * fx, base, lh0 * fh, lean, S * sz * (layer ? 1 : 0.9), seed);
-    });
-  }
-  g.restore();
+    drawPalm(g, pad + lw0 * fx, base, lh0 * fh, lean, S * sz, seed);
+  });
 }
 
 function buildGrain() {
@@ -248,7 +253,7 @@ function frame(t, fi) {
   const breathe = 1 + 0.05 * Math.sin(t * 2.1);
   const fp = prog(t, T_FILL, T_FILL_END);           // fill progress
   const hit = 0.45 * Math.exp(-Math.pow((t - T_DOT - 0.05) / 0.18, 2));   // light swells when the dot ignites
-  const I = up * flick * breathe * (1 - 0.3 * easeInOut(fp)) * (1 + hit);
+  const I = up * flick * breathe * (1 - 0.55 * easeInOut(fp)) * (1 + hit);
   // the light spreads out from behind the centre of the logo
   const spread = 120 + 1100 * easeOutCubic(prog(t, T_LIGHT, T_LIGHT_END + 0.3));
 
