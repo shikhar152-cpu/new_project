@@ -12,32 +12,33 @@
 <body>
 <canvas id="c" width="1080" height="1920"></canvas>
 <script>
-/* Xley logo reveal, vertical 9:16 motion graphic.
-   The logo is traced into vector pieces (X, L, E, Y, ring, dot) and built up:
-   black -> glowing outlines draw each letter in turn -> letters fill with a
-   sunset gradient one after another with a small pop -> the dot pops in with a
-   shockwave -> a light sweep crosses the logo, which then holds.
+/* Xley logo reveal, vertical 9:16 motion graphic, slow and cinematic.
+   The logo is traced into vector pieces (X, L, E, Y, ring, dot) and built up
+   with long, smooth eases and a continuous slow push-in:
+   black -> thin glowing outlines slowly draw every letter -> colour blooms up
+   through the letters -> the orange dot fades in -> a slow light sweep -> hold.
    Key moments land on the song's downbeats (126 bpm) after the brand clip.
    Deterministic: renderFrame(t) draws the frame at time t (seconds). */
 const W = 1080, H = 1920;
-const DURATION = 7.5;
+const DURATION = 11.5;
 const BEAT = 60 / 126;
-const T_DRAW = 0.915;                 // downbeat 1: outlines start drawing
-const T_FILL = T_DRAW + 4 * BEAT;     // downbeat 2: letters fill
-const T_DOT = T_FILL + 4 * BEAT;      // downbeat 3: dot pops
-const T_SHINE = T_DOT + 1.5 * BEAT;   // light sweep
-const LOGO_W = 860;                   // on-screen width
+const T0 = 0.915;                      // first downbeat after the clip
+const T_DRAW = T0, DRAW_DUR = 3.3;     // outlines draw slowly (two bars)
+const T_FILL = T0 + 8 * BEAT;          // colour blooms in on the next downbeat
+const FILL_DUR = 2.6;
+const T_DOT = T0 + 12 * BEAT;          // the dot fades in on the downbeat after
+const T_SHINE = T0 + 16 * BEAT;        // slow light sweep
+const LOGO_W = 860;                    // on-screen width at the end of the push-in
 
 const P = window.LOGO_PATHS;
-const K = LOGO_W / P.w;               // logo px -> screen px
+const K = LOGO_W / P.w;                // logo px -> screen px
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 
 // ---------- helpers ----------
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const prog = (t, a, b) => clamp((t - a) / (b - a));
-const easeInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-const easeOut = x => 1 - Math.pow(1 - x, 3);
-const easeOutElastic = x => x === 0 ? 0 : x === 1 ? 1 : Math.pow(2, -9 * x) * Math.sin((x * 10 - 0.75) * (2 * Math.PI) / 3) + 1;
+const sine = x => 0.5 - 0.5 * Math.cos(Math.PI * clamp(x));      // smooth in-out
+const easeOutQuart = x => 1 - Math.pow(1 - clamp(x), 4);
 
 // ---------- pieces ----------
 function polyPath(pts) { const p = new Path2D(); pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; }
@@ -52,14 +53,14 @@ function pointAt(pts, f) { // point at fraction f along the closed outline
   return pts[0];
 }
 const piece = name => P.pieces.find(p => p.name === name);
-// draw order and stagger: X with its ring first, then L, E, Y
-const ORDER = [['X', 0], ['ring', 0.12], ['L', 0.30], ['E', 0.55], ['Y', 0.80]];
+// gentle left-to-right stagger: X with its ring first, then L, E, Y
+const ORDER = [['X', 0], ['ring', 0.10], ['L', 0.25], ['E', 0.40], ['Y', 0.55]];
 const PIECES = ORDER.map(([name, delay]) => {
   const p = piece(name), pts = p.paths[0];
   // start each outline at its lowest-left point so the line travels up and round
   let s = 0; pts.forEach(([x, y], i) => { if (y - x * 0.3 > pts[s][1] - pts[s][0] * 0.3) s = i; });
   const rot = pts.slice(s).concat(pts.slice(0, s));
-  return { name, delay, pts: rot, path: polyPath(rot), len: polyLen(rot), cx: p.x + p.w / 2, cy: p.y + p.h / 2 };
+  return { name, delay, pts: rot, path: polyPath(rot), len: polyLen(rot) };
 });
 const DOT = { pts: P.dot[0], path: polyPath(P.dot[0]) };
 DOT.cx = DOT.pts.reduce((s, p) => s + p[0], 0) / DOT.pts.length;
@@ -84,101 +85,100 @@ function frame(t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
 
-  // camera: a very slow push in the whole time
-  const cam = 0.985 + 0.045 * easeInOut(prog(t, 0, DURATION));
+  // camera: one long, slow push-in
+  const cam = 0.92 + 0.08 * sine(prog(t, 0, DURATION));
   const sc = K * cam, ox = W / 2 - P.w * sc / 2, oy = H / 2 - P.h * sc / 2;
   const toLogo = () => ctx.setTransform(sc, 0, 0, sc, ox, oy);
   const px = v => v / sc;   // screen px -> logo px (for line widths)
 
-  // soft glow once the logo is filled
-  const lit = easeOut(prog(t, T_FILL, T_FILL + 1.2));
+  // a faint ambient glow that grows as the colour comes in
+  const lit = sine(prog(t, T_FILL, T_FILL + FILL_DUR + 1));
   if (lit > 0) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 620);
-    g.addColorStop(0, `rgba(150,60,200,${0.16 * lit})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 640 * cam);
+    g.addColorStop(0, `rgba(150,60,200,${0.14 * lit})`); g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
 
   for (const p of PIECES) {
-    const t0 = T_DRAW + p.delay, drawP = easeInOut(prog(t, t0, t0 + 1.25));
-    const f0 = T_FILL + p.delay * 0.35, fillP = prog(t, f0, f0 + 0.42);
+    const d0 = T_DRAW + p.delay, drawP = sine(prog(t, d0, d0 + DRAW_DUR));
+    const f0 = T_FILL + p.delay * 0.6, fillP = prog(t, f0, f0 + FILL_DUR);
     if (drawP <= 0) continue;
-
-    // pop: each piece kicks a little bigger as it fills, then settles
-    const pop = fillP > 0 ? 1 + 0.07 * Math.sin(Math.PI * clamp(fillP * 1.4)) * (1 - fillP * 0.3) : 1;
     toLogo();
-    ctx.translate(p.cx, p.cy); ctx.scale(pop, pop); ctx.translate(-p.cx, -p.cy);
 
-    // 1. the fill, wiping up from the bottom of each piece
+    // 1. colour blooms up through the letter: a soft, feathered rise plus a fade
     if (fillP > 0) {
-      const e = easeOut(fillP);
+      const e = sine(fillP), F = P.h * 0.7;
       ctx.save(); ctx.clip(p.path);
+      ctx.globalAlpha = clamp(e * 1.5);
       ctx.fillStyle = fillGrad(ctx); ctx.fill(p.path);
-      // still-unfilled top part stays dark, with a bright leading edge
-      const yTop = (P.h + 40) - (P.h + 80) * e;
-      ctx.fillStyle = '#000'; ctx.fillRect(-50, -50, P.w + 100, yTop + 50);
-      if (fillP < 1) {
-        const lg = ctx.createLinearGradient(0, yTop - 30, 0, yTop + 50);
-        lg.addColorStop(0, 'rgba(255,240,255,0)'); lg.addColorStop(0.45, `rgba(255,235,250,${0.9 * (1 - fillP)})`); lg.addColorStop(1, 'rgba(255,240,255,0)');
-        ctx.fillStyle = lg; ctx.fillRect(-50, yTop - 30, P.w + 100, 80);
-      }
-      // inner purple band along the edge (the stroke is clipped, so only its inner half shows)
-      ctx.globalAlpha = easeOut(prog(t, f0 + 0.2, f0 + 0.7));
+      ctx.globalAlpha = 1;
+      const yEdge = P.h + F - (P.h + 2 * F) * e;             // the veil lifts off upwards
+      const veil = ctx.createLinearGradient(0, yEdge - F, 0, yEdge);
+      veil.addColorStop(0, 'rgba(0,0,0,1)'); veil.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = veil; ctx.fillRect(-100, -100, P.w + 200, yEdge + 100);
+      // a soft light riding just under the rising colour
+      const glowY = yEdge - F * 0.35, gl = ctx.createLinearGradient(0, glowY - 90, 0, glowY + 90);
+      gl.addColorStop(0, 'rgba(255,235,250,0)'); gl.addColorStop(0.5, `rgba(255,235,250,${0.22 * Math.sin(Math.PI * e)})`); gl.addColorStop(1, 'rgba(255,235,250,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gl; ctx.fillRect(-100, glowY - 90, P.w + 200, 180);
+      ctx.globalCompositeOperation = 'source-over';
+      // inner purple band settles in once the colour is up
+      ctx.globalAlpha = sine(prog(t, f0 + 1.0, f0 + FILL_DUR + 0.6));
       ctx.lineJoin = 'round'; ctx.lineWidth = px(11); ctx.strokeStyle = 'rgba(80,30,190,0.85)'; ctx.stroke(p.path);
       ctx.globalAlpha = 1;
       ctx.restore();
     }
 
-    // 2. the outline drawing itself on, with a glow and a spark at its tip
+    // 2. the outline drawing itself on: thin line, soft glow, a gentle light at its tip
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.setLineDash([p.len * drawP, p.len * 2]);
-    const glowA = fillP > 0 ? 1 - 0.65 * easeOut(fillP) : 1;
+    const glowA = 1 - 0.6 * sine(fillP);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.shadowColor = 'rgba(255,90,200,0.9)'; ctx.shadowBlur = 26 * glowA;
-    ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(7); ctx.globalAlpha = 0.55 * glowA; ctx.stroke(p.path);
+    ctx.shadowColor = 'rgba(255,90,200,0.85)'; ctx.shadowBlur = 22 * glowA;
+    ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(6); ctx.globalAlpha = 0.45 * glowA; ctx.stroke(p.path);
     ctx.restore();
-    ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(3.2); ctx.stroke(p.path);
-    ctx.setLineDash([]);
+    ctx.globalAlpha = clamp(drawP * 4);
+    ctx.strokeStyle = lineGrad(ctx); ctx.lineWidth = px(3); ctx.stroke(p.path);
+    ctx.globalAlpha = 1; ctx.setLineDash([]);
 
-    if (drawP < 1) {
-      const [hx, hy] = pointAt(p.pts, drawP);
+    if (drawP > 0 && drawP < 1) {
+      const [hx, hy] = pointAt(p.pts, drawP), a = Math.sin(Math.PI * drawP);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      const sx = ox + hx * sc, sy = oy + hy * sc;
-      const sp = ctx.createRadialGradient(sx, sy, 0, sx, sy, 34);
-      sp.addColorStop(0, 'rgba(255,255,255,1)'); sp.addColorStop(0.25, 'rgba(255,200,240,0.8)'); sp.addColorStop(1, 'rgba(255,80,200,0)');
-      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = sp; ctx.fillRect(sx - 34, sy - 34, 68, 68);
+      const sx = ox + hx * sc, sy = oy + hy * sc, R = 26;
+      const sp = ctx.createRadialGradient(sx, sy, 0, sx, sy, R);
+      sp.addColorStop(0, `rgba(255,245,250,${0.85 * a})`); sp.addColorStop(0.3, `rgba(255,190,235,${0.45 * a})`); sp.addColorStop(1, 'rgba(255,80,200,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = sp; ctx.fillRect(sx - R, sy - R, 2 * R, 2 * R);
       ctx.globalCompositeOperation = 'source-over';
     }
   }
 
-  // 3. the orange dot pops in with a shockwave
-  const dp = prog(t, T_DOT, T_DOT + 0.7);
+  // 3. the orange dot fades and grows in, with a warm bloom that settles
+  const dp = prog(t, T_DOT, T_DOT + 1.5);
   if (dp > 0) {
     toLogo();
-    const s = easeOutElastic(dp);
+    const s = 0.6 + 0.4 * easeOutQuart(dp);
+    const bloom = 0.15 + 0.35 * Math.sin(Math.PI * clamp(dp * 1.25)) * (dp < 0.8 ? 1 : 1);
+    const bg = ctx.createRadialGradient(DOT.cx, DOT.cy, 0, DOT.cx, DOT.cy, DOT.r * 3.2);
+    bg.addColorStop(0, `rgba(255,150,70,${bloom * sine(dp * 2)})`); bg.addColorStop(1, 'rgba(255,120,50,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = bg; ctx.fillRect(DOT.cx - DOT.r * 4, DOT.cy - DOT.r * 4, DOT.r * 8, DOT.r * 8);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.save();
     ctx.translate(DOT.cx, DOT.cy); ctx.scale(s, s); ctx.translate(-DOT.cx, -DOT.cy);
+    ctx.globalAlpha = sine(dp * 1.4);
     const g = ctx.createRadialGradient(DOT.cx - DOT.r * 0.3, DOT.cy - DOT.r * 0.3, 0, DOT.cx, DOT.cy, DOT.r);
     g.addColorStop(0, '#ffb066'); g.addColorStop(1, '#e8853a');
-    ctx.fillStyle = g; ctx.fill(DOT.path);   // crisp brand-orange dot
+    ctx.fillStyle = g; ctx.fill(DOT.path);
     ctx.restore();
-    // shockwave rings
-    for (const [delay, maxR, w] of [[0, 7, 6], [0.08, 11, 3]]) {
-      const q = prog(t, T_DOT + delay, T_DOT + delay + 0.65);
-      if (q <= 0 || q >= 1) continue;
-      ctx.beginPath(); ctx.arc(DOT.cx, DOT.cy, DOT.r * (1 + maxR * easeOut(q)), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,170,90,${0.8 * (1 - q)})`; ctx.lineWidth = px(w * (1 - q) + 0.5); ctx.stroke();
-    }
   }
 
-  // 4. light sweep across the finished logo
-  const sw = prog(t, T_SHINE, T_SHINE + 0.9);
+  // 4. a slow, soft light sweep across the finished logo
+  const sw = prog(t, T_SHINE, T_SHINE + 2.0);
   if (sw > 0 && sw < 1) {
     toLogo(); ctx.save(); ctx.clip(ALL);
-    const x = -P.w * 0.3 + P.w * 1.6 * easeInOut(sw);
-    const g = ctx.createLinearGradient(x - 160, 0, x + 160, P.h * 0.35);
-    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,250,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    const x = -P.w * 0.35 + P.w * 1.7 * sine(sw);
+    const g = ctx.createLinearGradient(x - 240, 0, x + 240, P.h * 0.4);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, `rgba(255,250,255,${0.38 * Math.sin(Math.PI * sw)})`); g.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(-100, -100, P.w + 200, P.h + 200);
     ctx.restore();
   }
